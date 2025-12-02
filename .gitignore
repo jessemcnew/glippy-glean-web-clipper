@@ -78,3 +78,7 @@ ENV/
 # Archive/legacy files (optional - uncomment if you want to exclude)
 # archive/
 
+# Personal/user-specific files
+Users/
+**/Users/
+

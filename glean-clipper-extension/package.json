@@ -17,8 +17,8 @@
     "web-clipper",
     "knowledge-management"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Jesse McNew",
+  "license": "MIT",
   "description": "Chrome extension for clipping web content to Glean Collections",
   "dependencies": {
     "playwright": "^1.55.1",
