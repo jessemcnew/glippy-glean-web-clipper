@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Both Glean APIs</title>
+    <style>
+        body { font-family: system-ui; padding: 2rem; max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 2rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
+        .test-button { padding: 10px 20px; margin: 10px; background: #4F46E5; color: white; border: none; border-radius: 6px; cursor: pointer; }
+        .test-button:hover { background: #3730A3; }
+        .results { margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 6px; white-space: pre-wrap; font-family: monospace; font-size: 12px; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; width: 300px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Both Glean APIs</h1>
+    
+    <div class="test-section">
+        <h2>📋 Setup</h2>
+        <label>Glean Domain: <input type="text" id="domain" placeholder="your-company.glean.com" value="app.glean.com"></label><br>
+        <button class="test-button" onclick="saveDomain()">Save Domain</button>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Test Search API</h2>
+        <p><strong>Token:</strong> 9tWa42VhgKW3l1i54qO7KkKNEva+6Xm9o0GbGG2X4gg=</p>
+        <p><strong>Endpoint:</strong> /rest/api/v1/search</p>
+        <label>Search Query: <input type="text" id="searchQuery" placeholder="product roadmap" value="meeting"></label><br>
+        <button class="test-button" onclick="testSearchAPI()">🔍 Test Search</button>
+        <div id="searchResults" class="results" style="display: none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Test Indexing API</h2>
+        <p><strong>Token:</strong> bEdS6GTiDeQe2k0MBPsj7Edb6FCyzUmk5gg7tXVfvrg=</p>
+        <p><strong>Endpoint:</strong> /api/index/v1/indexdocument</p>
+        <button class="test-button" onclick="testIndexingAPI()">📝 Test Indexing</button>
+        <div id="indexResults" class="results" style="display: none;"></div>
+    </div>
+
+    <script>
+        let currentDomain = 'app.glean.com';
+
+        function saveDomain() {
+            currentDomain = document.getElementById('domain').value.trim();
+            console.log('Domain set to:', currentDomain);
+            alert('Domain saved: ' + currentDomain);
+        }
+
+        async function testSearchAPI() {
+            const query = document.getElementById('searchQuery').value.trim() || 'meeting';
+            const resultsDiv = document.getElementById('searchResults');
+            
+            resultsDiv.style.display = 'block';
+            resultsDiv.textContent = '🔄 Testing Search API...\n';
+
+            try {
+                // Convert domain format for Client API
+                let apiDomain = currentDomain.replace(/^https?:\/\//, '');
+                if (apiDomain.includes('-be.')) {
+                    apiDomain = apiDomain.replace('-be.', '.');
+                }
+                if (!apiDomain.includes('.glean.com')) {
+                    apiDomain = `${apiDomain}.glean.com`;
+                }
+
+                const searchUrl = `https://${apiDomain}/rest/api/v1/search`;
+                
+                const requestBody = {
+                    query: query,
+                    pageSize: 5
+                };
+
+                resultsDiv.textContent += `🚀 Making request to: ${searchUrl}\n`;
+                resultsDiv.textContent += `📦 Request body: ${JSON.stringify(requestBody, null, 2)}\n\n`;
+
+                const response = await fetch(searchUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer 9tWa42VhgKW3l1i54qO7KkKNEva+6Xm9o0GbGG2X4gg=',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                resultsDiv.textContent += `📡 Response status: ${response.status} ${response.statusText}\n`;
+                resultsDiv.textContent += `📋 Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}\n\n`;
+
+                const responseText = await response.text();
+                resultsDiv.textContent += `📄 Response body (first 1000 chars):\n${responseText.substring(0, 1000)}\n\n`;
+
+                if (response.ok) {
+                    const data = JSON.parse(responseText);
+                    resultsDiv.textContent += `✅ Search API SUCCESS!\n`;
+                    resultsDiv.textContent += `📊 Found ${data.results?.length || 0} results\n`;
+                } else {
+                    resultsDiv.textContent += `❌ Search API FAILED: ${response.status}\n`;
+                }
+
+            } catch (error) {
+                resultsDiv.textContent += `❌ Search API ERROR: ${error.message}\n`;
+                console.error('Search API Error:', error);
+            }
+        }
+
+        async function testIndexingAPI() {
+            const resultsDiv = document.getElementById('indexResults');
+            
+            resultsDiv.style.display = 'block';
+            resultsDiv.textContent = '🔄 Testing Indexing API...\n';
+
+            try {
+                // Convert domain format for Indexing API
+                let apiDomain = currentDomain.replace(/^https?:\/\//, '');
+                if (!apiDomain.includes('-be.')) {
+                    if (apiDomain.includes('app.')) {
+                        apiDomain = apiDomain.replace('app.', 'company-be.');
+                    } else if (apiDomain.includes('.glean.com')) {
+                        apiDomain = apiDomain.replace('.glean.com', '-be.glean.com');
+                    } else {
+                        apiDomain = `${apiDomain}-be.glean.com`;
+                    }
+                }
+
+                const indexingUrl = `https://${apiDomain}/api/index/v1/indexdocument`;
+                
+                const requestBody = {
+                    document: {
+                        datasource: 'WEBCLIPPER',
+                        objectType: 'WEBCLIP',
+                        id: `test-clip-${Date.now()}`,
+                        title: 'Test API Token Verification',
+                        body: {
+                            mimeType: 'text/plain',
+                            textContent: 'This is a test document to verify the Indexing API token works correctly.'
+                        },
+                        viewURL: 'https://test.example.com',
+                        permissions: {
+                            allowAnonymousAccess: false,
+                            allowAllDomainUsersAccess: true
+                        }
+                    }
+                };
+
+                resultsDiv.textContent += `🚀 Making request to: ${indexingUrl}\n`;
+                resultsDiv.textContent += `📦 Request body: ${JSON.stringify(requestBody, null, 2)}\n\n`;
+
+                const response = await fetch(indexingUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer bEdS6GTiDeQe2k0MBPsj7Edb6FCyzUmk5gg7tXVfvrg=',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                resultsDiv.textContent += `📡 Response status: ${response.status} ${response.statusText}\n`;
+                resultsDiv.textContent += `📋 Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}\n\n`;
+
+                const responseText = await response.text();
+                resultsDiv.textContent += `📄 Response body (first 1000 chars):\n${responseText.substring(0, 1000)}\n\n`;
+
+                if (response.ok) {
+                    resultsDiv.textContent += `✅ Indexing API SUCCESS!\n`;
+                    resultsDiv.textContent += `📝 Test document indexed successfully!\n`;
+                } else {
+                    resultsDiv.textContent += `❌ Indexing API FAILED: ${response.status}\n`;
+                }
+
+            } catch (error) {
+                resultsDiv.textContent += `❌ Indexing API ERROR: ${error.message}\n`;
+                console.error('Indexing API Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{
+  "name": "glean-clipper-extension",
+  "version": "1.0.0",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint --config eslint.config.mjs . --ext .js,.mjs,.cjs",
+    "lint:fix": "eslint --config eslint.config.mjs . --ext .js,.mjs,.cjs --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "quality": "npm run lint:fix && npm run format",
+    "quality:check": "npm run lint && npm run format:check"
+  },
+  "keywords": [
+    "chrome-extension",
+    "glean",
+    "web-clipper",
+    "knowledge-management"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "Chrome extension for clipping web content to Glean Collections",
+  "dependencies": {
+    "playwright": "^1.55.1",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsdoc": "^50.8.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.6.2"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,html,css}": [
+      "prettier --write"
+    ]
+  }
+}

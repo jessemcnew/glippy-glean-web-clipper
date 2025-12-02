@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    .settings-panel {
+      display: none;
+      background: white;
+      padding: 16px;
+      border: 1px solid #ccc;
+    }
+    
+    .settings-panel.active {
+      display: block;
+    }
+    
+    .settings-btn {
+      padding: 8px 16px;
+      background: #4F46E5;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Debug Settings Toggle</h1>
+  <button id="settings-btn" class="settings-btn">Toggle Settings</button>
+  
+  <div id="settings-panel" class="settings-panel">
+    <h2>Settings Panel</h2>
+    <p>This panel should toggle when you click the button above.</p>
+  </div>
+  
+  <script>
+    console.log('Debug script loaded');
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOM loaded');
+      
+      const settingsBtn = document.getElementById('settings-btn');
+      console.log('Settings button:', settingsBtn);
+      
+      if (settingsBtn) {
+        settingsBtn.addEventListener('click', function() {
+          console.log('Button clicked!');
+          const panel = document.getElementById('settings-panel');
+          console.log('Panel element:', panel);
+          if (panel) {
+            panel.classList.toggle('active');
+            console.log('Panel classes after toggle:', panel.className);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

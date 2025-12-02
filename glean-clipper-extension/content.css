@@ -1,0 +1,25 @@
+/* Additional styles for content script elements */
+
+#glean-clip-button {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+#glean-clip-button * {
+  pointer-events: none;
+}
+
+#glean-clip-button .glean-clip-btn {
+  pointer-events: auto;
+}
+
+/* Ensure proper rendering on all websites */
+#glean-clip-button {
+  all: initial;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  position: absolute !important;
+  z-index: 2147483647 !important; /* Maximum z-index */
+}

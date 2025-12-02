@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Glean Web Clipper",
+  "version": "1.0",
+  "description": "Clip web content to your personal Glean knowledge base",
+
+  "permissions": ["activeTab", "storage", "contextMenus", "scripting", "identity"],
+
+  "host_permissions": ["http://*/*", "https://*/*", "https://linkedin-be.glean.com/*"],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup-modern.html",
+    "default_title": "Clip to Glean",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["clipper-widget.html", "datasource-checker.html", "notebook-viewer.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

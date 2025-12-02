@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PING Test</title>
+</head>
+<body>
+  <h1>Extension PING Test</h1>
+  <div id="result"></div>
+  <script>
+    (async () => {
+      try {
+        const res = await new Promise((resolve) => {
+          chrome.runtime.sendMessage('ehajhplmdepljmlmfkpccfkbcjgcfgib', { type: 'PING' }, (r) => {
+            if (chrome.runtime.lastError) {
+              console.debug('runtime.sendMessage error:', chrome.runtime.lastError.message);
+              return resolve({ error: chrome.runtime.lastError.message });
+            }
+            resolve(r ?? null);
+          });
+        });
+        console.log('PING res:', res);
+        const lastError = chrome.runtime.lastError?.message || null;
+        document.getElementById('result').textContent = JSON.stringify({ lastError, response: res }, null, 2);
+      } catch (e) {
+        console.log('PING err:', e?.message || e);
+        document.getElementById('result').textContent = 'Error: ' + (e?.message || e);
+      }
+    })();
+  </script>
+</body>
+</html>
+

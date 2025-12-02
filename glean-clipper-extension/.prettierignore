@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.bundle.js
+
+# Archives and backups
+archive/
+*.backup
+*.bak
+
+# Package manager lockfiles
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Logs
+*.log
+
+# Test coverage
+coverage/
+
+# IDE files
+.vscode/
+.idea/

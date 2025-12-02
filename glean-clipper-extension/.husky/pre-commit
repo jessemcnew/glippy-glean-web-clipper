@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+# Pre-commit hook — delegate checks to external Python script
+
+# ----  NO-EMOJI GUARD  -------------------------------------------------
+# Run emoji check against staged files (excluding node_modules and dist).
+# If the Python script exits non-zero, reject the commit.
+git diff --cached --name-only | grep -Ev '(^|/)(node_modules|dist)/' \
+  | xargs python3 .husky/check-emoji.py || {
+  echo "Commit rejected – emoji detected. Please remove all emoji characters."
+  exit 1
+}
+# ----------------------------------------------------------------------
+
+exit 0

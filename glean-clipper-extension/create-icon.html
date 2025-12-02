@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Glean Icon Generator</title>
+  </head>
+  <body>
+    <canvas id="iconCanvas" width="128" height="128"></canvas>
+    <script>
+      const canvas = document.getElementById('iconCanvas');
+      const ctx = canvas.getContext('2d');
+
+      // Create Glean-style G icon
+      ctx.fillStyle = '#4F46E5'; // Glean purple
+      ctx.fillRect(0, 0, 128, 128);
+
+      // White G letter
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 80px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('G', 64, 64);
+
+      // Export as data URL
+      const dataURL = canvas.toDataURL('image/png');
+
+      // Download function
+      function downloadIcon(size) {
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = size;
+        tempCanvas.height = size;
+
+        tempCtx.drawImage(canvas, 0, 0, size, size);
+
+        const link = document.createElement('a');
+        link.download = `icon${size}.png`;
+        link.href = tempCanvas.toDataURL('image/png');
+        link.click();
+      }
+
+      // Auto-download icons
+      setTimeout(() => {
+        downloadIcon(16);
+        downloadIcon(48);
+        downloadIcon(128);
+      }, 100);
+    </script>
+  </body>
+</html>

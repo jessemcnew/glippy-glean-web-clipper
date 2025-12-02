@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Page for Web Clipper</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .highlight-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Glean Web Clipper Test Page</h1>
+    
+    <p>This page contains various types of content to test your web clipper extension. Select any text below and look for the blue "Clip" button!</p>
+    
+    <div class="highlight-section">
+        <h2>📋 How to Test Your Clipper</h2>
+        <p>Select this paragraph to test basic text clipping. The extension should automatically detect that this is documentation content and tag it accordingly.</p>
+    </div>
+    
+    <h2>💻 Code Example</h2>
+    <div class="code-block">
+function testWebClipper() {
+    console.log("Testing React component clipping");
+    const clipButton = document.querySelector('#glean-clip-button');
+    return clipButton ? 'Extension loaded!' : 'Extension not found';
+}
+    </div>
+    
+    <h2>🔧 API Documentation</h2>
+    <div class="highlight-section">
+        <p>The <strong>POST /api/index/v1/indexdocument</strong> endpoint allows you to index documents in your Glean datasource. This endpoint requires authentication via Bearer token and accepts JSON payloads with document metadata.</p>
+        <p>Required parameters include datasource, objectType, and document body content.</p>
+    </div>
+    
+    <h2>📊 Meeting Notes</h2>
+    <p>Action items from today's standup meeting:</p>
+    <ul>
+        <li>Review the web clipper implementation by Friday</li>
+        <li>Test the Glean API integration with different datasources</li>
+        <li>Update documentation for the new clipping workflow</li>
+        <li>Schedule follow-up meeting with stakeholders next week</li>
+    </ul>
+    
+    <h2>🎯 Testing Instructions</h2>
+    <ol>
+        <li><strong>Select any text</strong> on this page</li>
+        <li><strong>Look for the blue "Clip" button</strong> that appears above your selection</li>
+        <li><strong>Click "Clip"</strong> to save the content</li>
+        <li><strong>Check the extension popup</strong> to see your clipped content</li>
+        <li><strong>Try different types of content</strong> (code, documentation, meeting notes)</li>
+    </ol>
+    
+    <div class="highlight-section">
+        <h3>🤖 Machine Learning Example</h3>
+        <p>When training neural networks with TensorFlow and PyTorch, it's important to properly preprocess your data and set up appropriate loss functions. This content should be automatically tagged with 'machine learning' and 'backend' tags.</p>
+    </div>
+    
+    <h2>🛠️ Troubleshooting</h2>
+    <p>If the clip button doesn't appear:</p>
+    <ul>
+        <li>Make sure the extension is enabled in chrome://extensions/</li>
+        <li>Try reloading the extension</li>
+        <li>Check the browser console for any errors</li>
+        <li>Refresh this page after reloading the extension</li>
+    </ul>
+    
+    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666;">
+        <p>Test various content types: JavaScript code, API documentation, meeting notes, troubleshooting guides, and technical explanations.</p>
+    </footer>
+</body>
+</html>

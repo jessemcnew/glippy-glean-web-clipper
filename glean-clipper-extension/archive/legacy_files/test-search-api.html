@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Glean Search API</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .form-group { margin: 15px 0; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #4F46E5; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #4338CA; }
+        .results { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px; }
+        .error { background: #fee; color: #c00; }
+        .success { background: #efe; color: #060; }
+        .result-item { margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Test Glean Search API</h1>
+    <p>This will test your Glean search API key directly from the browser.</p>
+    
+    <form id="searchForm">
+        <div class="form-group">
+            <label for="domain">Glean Domain:</label>
+            <input type="text" id="domain" value="linkedin-be.glean.com" placeholder="your-company-be.glean.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="apiToken">API Token:</label>
+            <input type="password" id="apiToken" value="9tWa42VhgKW3l1i54qO7KkKNEva+6Xm9o0GbGG2X4gg=" placeholder="Your search API token">
+        </div>
+        
+        <div class="form-group">
+            <label for="query">Search Query:</label>
+            <input type="text" id="query" value="product roadmap" placeholder="What do you want to search for?">
+        </div>
+        
+        <button type="submit">🔍 Test Search</button>
+    </form>
+    
+    <div id="results"></div>
+
+    <script>
+        document.getElementById('searchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const domain = document.getElementById('domain').value;
+            const apiToken = document.getElementById('apiToken').value;
+            const query = document.getElementById('query').value;
+            const resultsDiv = document.getElementById('results');
+            
+            resultsDiv.innerHTML = '<div class="results">🔄 Searching...</div>';
+            
+            try {
+                const searchUrl = `https://${domain}/api/search/query`;
+                
+                console.log('Making request to:', searchUrl);
+                console.log('With query:', query);
+                console.log('Token length:', apiToken.length);
+                
+                const response = await fetch(searchUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        pageSize: 10,
+                        requestOptions: {
+                            debugOptions: {
+                                disableSpellcheck: false
+                            }
+                        }
+                    })
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                let html = `<div class="results success">
+                    <h3>✅ Search Successful!</h3>
+                    <p><strong>Query:</strong> "${query}"</p>
+                    <p><strong>Total Results:</strong> ${data.results ? data.results.length : 0}</p>
+                </div>`;
+                
+                if (data.results && data.results.length > 0) {
+                    html += '<h3>Results:</h3>';
+                    data.results.forEach((result, i) => {
+                        html += `
+                            <div class="result-item">
+                                <h4>${result.document?.title || 'Untitled'}</h4>
+                                <p>${result.document?.summary || result.document?.body?.substring(0, 200) || 'No description'}</p>
+                                <p><small>
+                                    <strong>URL:</strong> ${result.document?.url || 'N/A'}<br>
+                                    <strong>Type:</strong> ${result.document?.documentType || 'document'}<br>
+                                    <strong>Score:</strong> ${result.score || 0}
+                                </small></p>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += '<p>No results found for this query.</p>';
+                }
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Search error:', error);
+                resultsDiv.innerHTML = `
+                    <div class="results error">
+                        <h3>❌ Search Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p>Check the browser console (F12) for more details.</p>
+                    </div>
+                `;
+            }
+        });
+        
+        // Auto-focus the search button for quick testing
+        setTimeout(() => {
+            document.querySelector('button[type="submit"]').focus();
+        }, 100);
+    </script>
+</body>
+</html>

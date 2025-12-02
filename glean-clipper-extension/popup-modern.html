@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Glean Clipper</title>
+    <link rel="stylesheet" href="popup-modern.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Header -->
+      <div class="header">
+        <div class="header-content">
+          <div class="logo-section">
+            <div class="logo-icon">G</div>
+            <div>
+              <h1 class="app-title">Glean Clipper</h1>
+              <div class="clip-count" id="clip-count">0 clips saved</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="settings-icon-btn" title="Theme" style="display: none;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </button>
+            <button id="settings-btn" class="settings-icon-btn" title="Settings">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3m15.364 6.364l-4.243-4.243m-4.242 0L5.636 17.364m12.728 0l-4.243-4.243m-4.242 0L5.636 6.636"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="tabs-container">
+        <button class="tab-btn active" data-tab="clips">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+          </svg>
+          Clips
+        </button>
+        <button class="tab-btn" data-tab="settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3m15.364 6.364l-4.243-4.243m-4.242 0L5.636 17.364m12.728 0l-4.243-4.243m-4.242 0L5.636 6.636"></path>
+          </svg>
+          Settings
+        </button>
+        <div class="tab-indicator"></div>
+      </div>
+
+      <!-- Content Area -->
+      <div class="content-area">
+        <!-- Clips Tab -->
+        <div id="clips-tab" class="tab-content active">
+          <div id="clips-container" class="clips-list"></div>
+          <div id="empty-state" class="empty-state" style="display: none;">
+            <div class="empty-icon">📄</div>
+            <div>No clips yet</div>
+            <div class="empty-hint">Select text on any webpage and click the clip button</div>
+          </div>
+          <div style="padding: 12px; border-top: 1px solid #e5e7eb;">
+            <button id="clear-synced-clips-btn" class="btn btn-secondary" style="width: 100%; padding: 8px; font-size: 12px;">Clear All Synced Clips</button>
+          </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+          <div class="settings-panel">
+            <!-- Authentication -->
+            <div class="settings-card">
+              <h3 class="settings-card-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                  <polyline points="10 17 15 12 10 7"></polyline>
+                  <line x1="15" y1="12" x2="3" y2="12"></line>
+                </svg>
+                Step 1: Authentication
+              </h3>
+              <div class="form-group">
+                <div class="form-hint" style="margin-bottom: 12px; padding: 10px; background: #f3f4f6; border-radius: 6px; border: 1px solid #e5e7eb;">
+                  <strong>Quick Setup:</strong><br/>
+                  1. Go to Glean → Admin → Platform → Token Management<br/>
+                  2. Create a <strong>Client API token</strong><br/>
+                  3. Paste it below
+                </div>
+                <button id="oauth-authenticate-btn" class="oauth-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                  Open Glean Token Page
+                </button>
+                <button id="manual-token-toggle" class="manual-toggle-btn">Or Enter Token Manually</button>
+                <div id="token-input-group" class="token-input-group" style="display: none;">
+                  <label class="form-label" style="margin-top: 12px;">Client API Token</label>
+                  <input type="password" id="glean-client-token" class="form-input" placeholder="Paste your Client API token here" />
+                  <div class="form-hint">Get this from Glean Admin → Platform → Token Management → Client tab</div>
+                </div>
+                <div id="oauth-status" class="oauth-status" style="display: none;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  Token saved
+                </div>
+              </div>
+            </div>
+
+            <!-- Default Collection -->
+            <div class="settings-card">
+              <h3 class="settings-card-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Step 2: Select Collection
+              </h3>
+              <div class="form-group">
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                  <input type="text" id="collection-search-input" class="form-input" placeholder="Search collections..." style="flex: 1;" />
+                  <button id="clear-collection-btn" class="btn btn-secondary" style="padding: 8px 16px; white-space: nowrap; display: none;">Clear</button>
+                </div>
+                <div id="collection-results" style="max-height: 200px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; display: none;"></div>
+                <select id="glean-collection-id" class="form-select" style="position: absolute; opacity: 0; pointer-events: none; height: 0; width: 0;">
+                  <option value="">Select a collection...</option>
+                </select>
+                <div class="form-hint">Type to search collections. Click "Test Connection" first to load them.</div>
+              </div>
+            </div>
+
+            <!-- Sync Toggle -->
+            <div class="settings-card">
+              <div class="sync-toggle-group">
+                <label class="sync-toggle">
+                  <input type="checkbox" id="glean-enabled" />
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-label">Sync clips to Glean</span>
+                </label>
+                <span id="connection-status" class="status-badge disconnected">Disconnected</span>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+              <button id="save-settings" class="btn btn-primary">Save Settings</button>
+              <div class="button-grid">
+                <button id="test-connection" class="btn btn-success">Test Connection</button>
+                <button id="test-sync" class="btn btn-secondary">Test Sync</button>
+                <button id="open-debugger" class="btn btn-warning">Open Debugger</button>
+              </div>
+            </div>
+
+            <!-- View Notebook -->
+            <div class="notebook-section">
+              <button id="view-notebook-btn" class="btn btn-notebook">
+                View Notebook
+              </button>
+              <div class="notebook-hint">Search, sort, and explore all your clips</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
+
