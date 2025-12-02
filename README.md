@@ -2,17 +2,17 @@
 
 A Chrome extension and Next.js dashboard for clipping web content directly to your Glean Collections.
 
-## 🚀 Features
+## Features
 
-- **Quick Clipping**: Select text on any webpage and save it to Glean
-- **Context Menu Integration**: Right-click to clip selected text or entire pages
-- **Smart Categorization**: Automatically categorizes content based on URL and content type
-- **Tag Extraction**: Automatically identifies relevant tags from clipped content
-- **Local Storage**: Works offline with local storage, syncs when connected
-- **Glean Collections API**: Direct integration with Glean's Collections API
-- **Modern Dashboard**: Next.js-based dashboard for managing your clips
+- Quick clipping: Select text on any webpage and save it to Glean
+- Context menu integration: Right-click to clip selected text or entire pages
+- Automatic categorization: Categorizes content based on URL and content type
+- Tag extraction: Identifies relevant tags from clipped content
+- Offline support: Works offline with local storage, syncs when connected
+- Glean Collections API: Direct integration with Glean's Collections API
+- Dashboard: Next.js-based dashboard for managing your clips
 
-## 📦 Project Structure
+## Project Structure
 
 ```
 glippy/
@@ -30,14 +30,14 @@ glippy/
     └── package.json
 ```
 
-## 🛠️ Installation
+## Installation
 
 ### Prerequisites
 
-1. **Glean Account**: You need an active Glean account with access to Collections
-2. **API Token**: A Client API token with COLLECTIONS scope (NOT an Indexing API token)
-3. **Collection ID**: The numeric ID of the collection you want to clip to
-4. **Chrome Browser**: Version 88 or higher for Manifest V3 support
+1. An active Glean account with access to Collections
+2. A Client API token with COLLECTIONS scope (not an Indexing API token)
+3. The numeric ID of the collection you want to clip to
+4. Chrome browser version 88 or higher for Manifest V3 support
 
 ### Chrome Extension Setup
 
@@ -59,24 +59,24 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to view the dashboard.
 
-## 📖 Usage
+## Usage
 
 ### Clipping Content
 
-**Method 1: Toolbar Button**
+**Toolbar Button**
 1. Select text on any webpage
 2. Click the Glean Clipper extension icon
 3. The selected text is automatically clipped
 
-**Method 2: Context Menu**
+**Context Menu**
 1. Select text on a webpage
-2. Right-click and choose **"Clip to Glean Collection"**
+2. Right-click and choose "Clip to Glean Collection"
 
-**Method 3: Full Page Clip**
+**Full Page Clip**
 1. Right-click anywhere on a page (without selecting text)
-2. Choose **"Clip entire page"**
+2. Choose "Clip entire page"
 
-## 🔧 Development
+## Development
 
 ### Extension Development
 
@@ -97,29 +97,29 @@ npm run dev         # Start development server
 npm run build       # Build for production
 ```
 
-## 📝 Documentation
+## Documentation
 
 - [Extension README](./glean-clipper-extension/README.md) - Detailed extension documentation
 - [Changelog](./glean-clipper-extension/CHANGELOG.md) - Version history
 - [Features](./glean-clipper-extension/FEATURES.md) - Feature documentation
 - [Debugging Guide](./glean-clipper-extension/DEBUGGING_GUIDE.md) - Troubleshooting
 
-## 🔐 Security
+## Security
 
 - API tokens are stored in Chrome's local storage (encrypted at rest on disk)
 - Never commit API tokens to version control
 - Use environment variables for test scripts
 - Tokens are only sent to Glean's API endpoints
 
-## 🤝 Contributing
+## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome. Please feel free to submit a Pull Request.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built for integration with [Glean](https://www.glean.com)
 - Uses Next.js for the dashboard
