@@ -1,6 +1,6 @@
 # Glippy - Glean Web Clipper
 
-A Chrome extension and Next.js dashboard for clipping web content directly to your Glean Collections.
+A Chrome extension and Next.js dashboard for clipping web content directly to your Glean Collections. Leverages Glean's Collections API and context engineering principles to aggregate resources from both internal enterprise systems and external web content, creating a unified knowledge base for teams.
 
 > **Note:** This project is actively being developed. Features and APIs may change.
 
