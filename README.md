@@ -2,6 +2,10 @@
 
 A Chrome extension and Next.js dashboard for clipping web content directly to your Glean Collections.
 
+> **Note:** This project is actively being developed. Features and APIs may change.
+
+[Watch the demo video](https://www.linkedin.com/posts/markjeromecruz_innovation-hackathon-ai-ugcPost-7396822203314487296-HcgH)
+
 ## Features
 
 - Quick clipping: Select text on any webpage and save it to Glean
