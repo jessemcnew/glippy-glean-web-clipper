@@ -60,6 +60,10 @@ test-results/
 *.pem
 *.zip
 
+# Context/agent files (may contain sensitive data)
+*_context.txt
+glean_context.txt
+
 # Temporary files
 *.tmp
 *.temp
