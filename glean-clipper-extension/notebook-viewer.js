@@ -746,15 +746,20 @@ async function searchGlean(query, config) {
     console.log('📦 GLEAN SEARCH: Request body:', requestBody);
 
     // Create headers with OAuth auth type
-    const headers = createCollectionsAPIHeaders(gleanConfig.clientToken);
+    const tokenType = gleanConfig.tokenType || 'glean-issued';
+    const headers = createCollectionsAPIHeaders(gleanConfig.clientToken, {}, tokenType);
 
-    const data = await fetchJSON(searchUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-      mode: 'cors',
-      credentials: 'omit',
-    });
+    const data = await fetchJSON(
+      searchUrl,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+        mode: 'cors',
+        credentials: 'omit',
+      },
+      { gleanConfig }
+    );
 
     console.log('✅ GLEAN SEARCH: Received response with', data.results?.length || 0, 'results');
 
