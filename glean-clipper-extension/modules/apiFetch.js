@@ -2,6 +2,9 @@
 // Provides consistent fetch behavior with timeout, retry, and error handling for Glean APIs
 // Reference: https://developers.glean.com/api-info/client/authentication/overview
 
+// Import mock API for dev mode
+import { interceptMockAPI } from './mockApi.js';
+
 /**
  * Performs a fetch request with timeout, retry logic, and proper error handling
  * @param {string} url - The full URL to fetch
@@ -79,10 +82,21 @@ async function fetchWithRetry(url, options = {}, config = {}) {
  * Performs a JSON fetch request with automatic parsing and error handling
  * @param {string} url - The full URL to fetch
  * @param {Object} options - Fetch options
- * @param {Object} config - Configuration (timeout, maxRetries, isIdempotent)
+ * @param {Object} config - Configuration (timeout, maxRetries, isIdempotent, devMode, gleanConfig)
  * @returns {Promise<Object>} Parsed JSON response
  */
 async function fetchJSON(url, options = {}, config = {}) {
+  // Check if mock mode is enabled
+  // config can be either the fetch config or a gleanConfig object
+  const gleanConfig = config.gleanConfig || config;
+  if (gleanConfig && gleanConfig.devMode) {
+    const mockResponse = await interceptMockAPI(url, options, gleanConfig);
+    if (mockResponse !== null) {
+      console.log('🎭 MOCK MODE: Returning mock response');
+      return mockResponse;
+    }
+  }
+
   const response = await fetchWithRetry(url, options, config);
 
   // Get response text first to handle empty responses
@@ -133,16 +147,22 @@ async function fetchJSON(url, options = {}, config = {}) {
  * 
  * @param {string} token - Token (Glean-issued or OAuth)
  * @param {Object} additionalHeaders - Additional headers to include (e.g., X-Glean-ActAs for global tokens)
- * @param {boolean} isOAuthToken - Whether this is an OAuth token (default: false for Glean-issued tokens)
+ * @param {string|boolean} tokenType - Token type: 'oauth', 'glean-issued', or boolean for backward compatibility (default: 'glean-issued')
  * @returns {Object} Headers object
  */
-function createCollectionsAPIHeaders(token, additionalHeaders = {}, isOAuthToken = false) {
+function createCollectionsAPIHeaders(token, additionalHeaders = {}, tokenType = 'glean-issued') {
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'Authorization': `Bearer ${token.trim()}`,
     ...additionalHeaders,
   };
+
+  // Determine if this is an OAuth token
+  // Support both new tokenType string format and legacy boolean format
+  const isOAuthToken = typeof tokenType === 'boolean' 
+    ? tokenType 
+    : tokenType === 'oauth';
 
   // Only add X-Glean-Auth-Type for OAuth tokens, NOT for Glean-issued tokens
   // Reference: https://developers.glean.com/api-info/client/authentication/glean-issued
