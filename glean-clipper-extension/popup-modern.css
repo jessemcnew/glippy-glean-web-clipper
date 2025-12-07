@@ -203,24 +203,25 @@ body {
 .clips-list {
   display: flex;
   flex-direction: column;
-  padding: 0 16px;
+  padding: 0;
   padding-bottom: 16px;
+  background: white;
+  overflow-y: auto;
 }
 
 .clip-item {
-  background: #f3f4f6;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: none;
-  border: none;
-  transition: all 0.2s;
+  background: white;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s;
   cursor: pointer;
-  margin-bottom: 12px;
 }
 
 .clip-item:hover {
-  background: #e5e7eb;
-  transform: translateY(-1px);
+  background: #f9fafb;
+}
+
+.clip-item:last-child {
+  border-bottom: none;
 }
 
 .clip-title {
@@ -517,7 +518,7 @@ body {
 }
 
 .status-badge.ready {
-  background: #000000;
+  background: #10b981;
   color: white;
 }
 
