@@ -137,11 +137,16 @@ function renderClips() {
       clipsContainer.innerHTML = '';
     }
     if (emptyState) {
-      emptyState.style.display = 'block';
+      emptyState.style.display = 'flex';
+      emptyState.style.flexDirection = 'column';
+      emptyState.style.alignItems = 'center';
+      emptyState.style.justifyContent = 'center';
+      emptyState.style.padding = '48px 24px';
+      emptyState.style.textAlign = 'center';
       emptyState.innerHTML = `
-        <div class="empty-icon">📄</div>
-        <div>${searchQuery || activeFilter !== 'all' ? 'No matching clips' : 'No clips yet'}</div>
-        <div class="empty-hint">${searchQuery || activeFilter !== 'all' ? 'Try adjusting your search or filter' : 'Select text on any webpage and click the clip button'}</div>
+        <div class="empty-icon" style="font-size: 48px; margin-bottom: 16px;">📄</div>
+        <div style="font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 8px;">${searchQuery || activeFilter !== 'all' ? 'No matching clips' : 'No clips yet'}</div>
+        <div class="empty-hint" style="font-size: 14px; color: #6b7280;">${searchQuery || activeFilter !== 'all' ? 'Try adjusting your search or filter' : 'Select text on any webpage and click the clip button'}</div>
     `;
     }
     // Note: stats element doesn't exist in new UI
@@ -257,23 +262,57 @@ function renderClips() {
         } else if (clip.url) {
           try {
             const urlObj = new URL(clip.url);
-            faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=16`;
+            faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=48`;
           } catch (e) {
             // Invalid URL, skip favicon
           }
         }
         
+        // Get domain name and word count for feed-style display
+        const domainName = clip.domain || getDomainName(clip.url);
+        const wordCount = estimateWordCount(clip.selectedText || clip.title);
+        const timeAgo = formatDate(clip.timestamp);
+        
         return `
-    <div class="clip-item" data-clip-id="${clip.id}" style="display: flex; gap: 12px; align-items: flex-start;">
-      ${faviconUrl ? `<img src="${faviconUrl}" style="width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0;" onerror="this.style.display='none'">` : '<div style="width: 16px;"></div>'}
+    <div class="clip-item" data-clip-id="${clip.id}" style="
+      display: flex; 
+      gap: 16px; 
+      align-items: flex-start; 
+      padding: 16px 0;
+      border-bottom: 1px solid #f3f4f6;
+      cursor: pointer;
+      transition: background 0.15s;
+    " onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+      ${faviconUrl ? `
+        <img src="${faviconUrl}" 
+             style="width: 48px; height: 48px; border-radius: 8px; flex-shrink: 0; object-fit: cover; border: 1px solid #e5e7eb;" 
+             onerror="this.style.display='none'">` : 
+        `<div style="width: 48px; height: 48px; border-radius: 8px; background: #f3f4f6; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 20px; font-weight: 600; border: 1px solid #e5e7eb;">${domainName.charAt(0).toUpperCase()}</div>`}
       <div style="flex: 1; min-width: 0;">
-        <a href="${clip.url || '#'}" target="_blank" class="clip-title-link" style="text-decoration: none; color: inherit; display: block;">
-          <div class="clip-title" style="cursor: pointer; color: #111827;">${escapeHtml(clip.title)}</div>
+        <a href="${clip.url || '#'}" target="_blank" class="clip-title-link" style="text-decoration: none; color: inherit; display: block;" onclick="event.stopPropagation()">
+          <div class="clip-title" style="
+            font-size: 16px; 
+            font-weight: 600; 
+            color: #111827; 
+            line-height: 1.4;
+            margin-bottom: 8px;
+            cursor: pointer;
+          ">${escapeHtml(clip.title)}</div>
         </a>
-        <div class="clip-meta" style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-          <div style="font-size: 11px; color: #9ca3af;">${formatDate(clip.timestamp)}</div>
-          ${syncIndicator}
+        <div class="clip-meta" style="
+          display: flex; 
+          align-items: center; 
+          gap: 8px;
+          font-size: 13px; 
+          color: #6b7280;
+          margin-bottom: 4px;
+        ">
+          <span style="font-weight: 500;">${escapeHtml(domainName)}</span>
+          <span>·</span>
+          <span>${timeAgo}</span>
+          ${wordCount > 0 ? `<span>·</span><span>${wordCount} words</span>` : ''}
         </div>
+        ${syncIndicator}
       </div>
     </div>
   `;
@@ -318,6 +357,22 @@ function formatDate(timestamp) {
   } else {
     return date.toLocaleDateString();
   }
+}
+
+// Get domain name from URL for display
+function getDomainName(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace('www.', '');
+  } catch (e) {
+    return 'Unknown';
+  }
+}
+
+// Estimate word count from text
+function estimateWordCount(text) {
+  if (!text) return 0;
+  return text.trim().split(/\s+/).length;
 }
 
 // Escape HTML to prevent XSS
@@ -407,7 +462,26 @@ async function loadSettings() {
       if (enabledEl) {
         enabledEl.checked = config.enabled || false;
       }
-      updateConnectionStatus(config);
+      
+  // Dev mode toggle
+  const devModeEl = getElement('dev-mode');
+  if (devModeEl) {
+    devModeEl.checked = config.devMode || false;
+    // Add listener to update status when toggled
+    if (!devModeEl.hasAttribute('data-listener-added')) {
+      devModeEl.setAttribute('data-listener-added', 'true');
+      devModeEl.addEventListener('change', async () => {
+        const result = await chrome.storage.local.get(['gleanConfig']);
+        const currentConfig = result.gleanConfig || {};
+        currentConfig.devMode = devModeEl.checked;
+        await chrome.storage.local.set({ gleanConfig: currentConfig });
+        updateConnectionStatus(currentConfig);
+        console.log('Dev mode toggled:', devModeEl.checked);
+      });
+    }
+  }
+  
+  updateConnectionStatus(config);
     } else {
       // Default values when not in extension context
       const config = { domain: 'app.glean.com', apiToken: '', collectionId: '', enabled: true };
@@ -515,9 +589,12 @@ async function saveSettings() {
   console.log('SAVE SETTINGS - Final Collection ID:', collectionId);
   const enabledEl = getElement('glean-enabled');
   const enabled = enabledEl ? enabledEl.checked : false;
+  
+  const devModeEl = getElement('dev-mode');
+  const devMode = devModeEl ? devModeEl.checked : false;
 
-  // Validate required fields
-  if (!clientToken) {
+  // Validate required fields (skip if dev mode is enabled)
+  if (!clientToken && !devMode) {
     // Show the token input if it's hidden
     const tokenInputGroup = getElement('token-input-group');
     if (tokenInputGroup && tokenInputGroup.style.display === 'none') {
@@ -555,6 +632,8 @@ async function saveSettings() {
     clientToken, // Collections API token (from UI) - alias for compatibility
     collectionId: collectionId || '', // Save empty string if not provided (don't use undefined)
     enabled,
+    devMode, // Mock API mode for offline development
+    tokenType: 'glean-issued', // Default to Glean-issued tokens (can be 'oauth' or 'glean-issued')
     // Preserve authMethod if already set
     authMethod: clientToken ? 'oauth' : undefined,
     // Note: Indexing token should be configured separately if needed
@@ -626,14 +705,24 @@ function updateConnectionStatus(config) {
   const statusEl = getElement('connection-status');
   if (!statusEl) return;
 
+  // Check if dev mode is enabled
+  if (config.devMode) {
+    statusEl.textContent = 'Mock Mode';
+    statusEl.className = 'status-badge ready';
+    statusEl.title = 'Mock API mode enabled - using simulated responses';
+    return;
+  }
+
   // Check if enabled, domain set, and has token
   const hasToken = !!(config.apiToken || config.clientToken);
   if (config.enabled && config.domain && hasToken) {
     statusEl.textContent = 'Ready';
     statusEl.className = 'status-badge ready';
+    statusEl.title = '';
   } else {
     statusEl.textContent = 'Disconnected';
     statusEl.className = 'status-badge disconnected';
+    statusEl.title = '';
   }
 }
 
@@ -673,6 +762,12 @@ function setupEventListeners() {
   const viewNotebookBtn = getElement('view-notebook-btn');
   if (viewNotebookBtn) {
     viewNotebookBtn.addEventListener('click', openNotebook);
+  }
+
+  // Quick clip button
+  const quickClipBtn = getElement('quick-clip-btn');
+  if (quickClipBtn) {
+    quickClipBtn.addEventListener('click', handleQuickClip);
   }
 
   // Settings button
@@ -877,6 +972,14 @@ async function testConnection() {
   const testBtn = getElement('test-connection');
   if (!testBtn) return;
   
+  // Check if dev mode is enabled - but allow test in mock mode to show mock collections
+  const result = await chrome.storage.local.get(['gleanConfig']);
+  const config = result.gleanConfig || {};
+  if (config.devMode) {
+    // In mock mode, proceed with test to show mock collections
+    console.log('🎭 Mock API Mode: Testing connection will return mock data');
+  }
+  
   const originalText = testBtn.textContent;
   testBtn.textContent = 'Testing...';
   testBtn.disabled = true;
@@ -944,6 +1047,13 @@ async function testSync() {
 
   const testBtn = getElement('test-sync');
   if (!testBtn) return;
+  
+  // Check if dev mode is enabled
+  const result = await chrome.storage.local.get(['gleanConfig']);
+  const config = result.gleanConfig || {};
+  if (config.devMode) {
+    alert('🎭 Mock API Mode is enabled!\n\nThis will simulate a successful sync. Disable Mock API Mode in Developer Options to test real sync.');
+  }
   
   const originalText = testBtn.textContent;
   testBtn.textContent = 'Testing...';
@@ -1654,4 +1764,159 @@ function toggleManualToken() {
     tokenGroup.style.display = 'none';
     toggleBtn.textContent = 'Manual';
   }
+}
+
+// Handle quick clip button click
+async function handleQuickClip() {
+  if (!isChromeExtension()) {
+    alert('Quick clip only works when extension is installed');
+    return;
+  }
+
+  const quickClipBtn = getElement('quick-clip-btn');
+  if (!quickClipBtn) return;
+
+  const originalText = quickClipBtn.textContent;
+  quickClipBtn.disabled = true;
+  quickClipBtn.textContent = 'Clipping...';
+
+  try {
+    // Get the current active tab
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs.length === 0) {
+      throw new Error('No active tab found');
+    }
+
+    const tab = tabs[0];
+
+    // Inject script to clip the page
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      function: clipCurrentPageForQuickClip,
+    });
+
+    // Show success feedback
+    quickClipBtn.textContent = '✓ Clipped!';
+    quickClipBtn.style.background = '#10b981';
+    
+    // Reload clips to show the new one
+    setTimeout(async () => {
+      await loadClips();
+      quickClipBtn.textContent = originalText;
+      quickClipBtn.style.background = '';
+      quickClipBtn.disabled = false;
+    }, 1000);
+  } catch (error) {
+    console.error('Quick clip failed:', error);
+    quickClipBtn.textContent = 'Failed';
+    quickClipBtn.style.background = '#ef4444';
+    setTimeout(() => {
+      quickClipBtn.textContent = originalText;
+      quickClipBtn.style.background = '';
+      quickClipBtn.disabled = false;
+    }, 2000);
+  }
+}
+
+// Function to inject for quick clip (runs in page context)
+function clipCurrentPageForQuickClip() {
+  function showClipFeedback(message, type = 'success') {
+    // Remove any existing feedback
+    const existing = document.getElementById('glean-clip-feedback');
+    if (existing) existing.remove();
+
+    const feedback = document.createElement('div');
+    feedback.id = 'glean-clip-feedback';
+    feedback.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 999999;
+      background: ${type === 'error' ? '#EF4444' : '#10B981'};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      animation: gleanSlideIn 0.3s ease;
+      pointer-events: none;
+    `;
+
+    feedback.textContent = message;
+    document.body.appendChild(feedback);
+
+    // Add animation styles if not already present
+    if (!document.getElementById('glean-clip-feedback-styles')) {
+      const style = document.createElement('style');
+      style.id = 'glean-clip-feedback-styles';
+      style.textContent = `
+        @keyframes gleanSlideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes gleanSlideOut {
+          from { transform: translateX(0); opacity: 1; }
+          to { transform: translateX(100%); opacity: 0; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    setTimeout(() => {
+      feedback.style.animation = 'gleanSlideOut 0.3s ease forwards';
+      setTimeout(() => feedback.remove(), 300);
+    }, 2000);
+  }
+
+  const mainContent = document.querySelector('main, article, .content, #content') || document.body;
+  const faviconLink = document.querySelector('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
+  let favicon = '';
+  if (faviconLink && faviconLink.href) {
+    if (faviconLink.href.startsWith('/')) {
+      favicon = window.location.origin + faviconLink.href;
+    } else if (!faviconLink.href.startsWith('http')) {
+      favicon = window.location.origin + '/' + faviconLink.href;
+    } else {
+      favicon = faviconLink.href;
+    }
+  } else {
+    favicon = `https://www.google.com/s2/favicons?domain=${window.location.hostname}&sz=16`;
+  }
+  
+  const heading = document.querySelector('h1, h2, .headline, .title, article h1')?.textContent?.trim() || document.title;
+  const firstParagraph = document.querySelector('article p, .content p, main p')?.textContent?.trim() || '';
+  
+  let cleanedText = '';
+  if (heading && firstParagraph) {
+    cleanedText = `${heading}\n\n${firstParagraph.substring(0, 500)}`;
+  } else {
+    cleanedText = mainContent.textContent?.trim().substring(0, 1000) || '';
+  }
+  
+  chrome.runtime.sendMessage({
+    action: 'saveClip',
+    data: {
+      url: window.location.href,
+      title: document.title,
+      selectedText: cleanedText,
+      context: 'Full page clip',
+      timestamp: new Date().toISOString(),
+      domain: window.location.hostname,
+      favicon: favicon,
+    },
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      showClipFeedback('Failed to clip: ' + chrome.runtime.lastError.message, 'error');
+      return;
+    }
+    if (response && response.success) {
+      showClipFeedback('✓ Clipped to Glean!');
+    } else if (response && response.error) {
+      showClipFeedback('Failed: ' + response.error, 'error');
+    } else {
+      showClipFeedback('✓ Clipped to Glean!');
+    }
+  });
 }
