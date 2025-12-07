@@ -53,16 +53,21 @@ async function validateOAuthToken(token, config) {
     const baseUrl = normalizeDomain(config.domain);
     const testUrl = `${baseUrl}/rest/api/v1/search`;
 
-    const headers = createCollectionsAPIHeaders(token);
+    // OAuth module validates OAuth tokens, so use 'oauth' type
+    const headers = createCollectionsAPIHeaders(token, {}, 'oauth');
 
     // Make a lightweight API call to test token
-    await fetchJSON(testUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ query: 'test', pageSize: 1 }),
-      mode: 'cors',
-      credentials: 'omit',
-    });
+    await fetchJSON(
+      testUrl,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ query: 'test', pageSize: 1 }),
+        mode: 'cors',
+        credentials: 'omit',
+      },
+      { gleanConfig: config }
+    );
 
     return true;
   } catch (error) {

@@ -101,8 +101,10 @@ async function syncToGleanCollections(clip, config) {
     ],
   };
 
-  // Create headers with OAuth auth type (required per docs)
-  const headers = createCollectionsAPIHeaders(config.apiToken);
+  // Create headers with appropriate auth type based on token type
+  // Default to 'glean-issued' for backward compatibility
+  const tokenType = config.tokenType || 'glean-issued';
+  const headers = createCollectionsAPIHeaders(config.apiToken, {}, tokenType);
 
   console.log('SENDING: Collections API Request');
   console.log('URL:', collectionsUrl);
@@ -110,21 +112,29 @@ async function syncToGleanCollections(clip, config) {
   console.log('Payload:', JSON.stringify(payload, null, 2));
 
   try {
-    const result = await fetchJSON(collectionsUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      mode: 'cors',
-      credentials: 'omit',
-    });
+    const result = await fetchJSON(
+      collectionsUrl,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        mode: 'cors',
+        credentials: 'omit',
+      },
+      { gleanConfig: config }
+    );
 
     // Collections API typically returns an empty response on success
     console.log('SUCCESS: Item added to collection');
     return { success: true, message: 'Successfully added to Glean collection', ...result };
   } catch (error) {
-    // Provide more specific error messages
-    if (error.status === 401) {
-      throw new Error(`Authentication failed (401): Check your API token and ensure it's an OAuth token`);
+    // Provide more specific error messages with network detection
+    if (error.message && error.message.includes('timeout')) {
+      throw new Error(`Network timeout: Cannot reach Glean API. Are you connected to VPN?\n\nOriginal error: ${error.message}`);
+    } else if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+      throw new Error(`Network error: Cannot reach Glean API. Check:\n1. Are you connected to VPN?\n2. Is your network connection working?\n3. Is the Glean domain correct?\n\nOriginal error: ${error.message}`);
+    } else if (error.status === 401) {
+      throw new Error(`Authentication failed (401): Check your API token and ensure it's valid`);
     } else if (error.status === 403) {
       throw new Error(`Access forbidden (403): Check token permissions and collection access`);
     } else if (error.status === 404) {
@@ -181,19 +191,27 @@ async function syncToGleanIndexingAPI(clip, config) {
   console.log('Payload:', JSON.stringify(payload, null, 2));
 
   try {
-    const result = await fetchJSON(indexingUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      mode: 'cors',
-      credentials: 'omit',
-    });
+    const result = await fetchJSON(
+      indexingUrl,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        mode: 'cors',
+        credentials: 'omit',
+      },
+      { gleanConfig: config }
+    );
 
     console.log('SUCCESS: Document indexed to Glean');
     return { success: true, message: 'Successfully indexed to Glean', ...result };
   } catch (error) {
-    // Provide more specific error messages
-    if (error.status === 401) {
+    // Provide more specific error messages with network detection
+    if (error.message && error.message.includes('timeout')) {
+      throw new Error(`Network timeout: Cannot reach Glean API. Are you connected to VPN?\n\nOriginal error: ${error.message}`);
+    } else if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+      throw new Error(`Network error: Cannot reach Glean API. Check:\n1. Are you connected to VPN?\n2. Is your network connection working?\n3. Is the Glean domain correct?\n\nOriginal error: ${error.message}`);
+    } else if (error.status === 401) {
       throw new Error(`Authentication failed (401): Check your indexing token`);
     } else if (error.status === 403) {
       throw new Error(`Access forbidden (403): Check token permissions`);
@@ -287,15 +305,24 @@ async function fetchGleanCollections() {
 
   try {
     const config = await getGleanConfig();
-    if (!config.enabled) {
-      console.log('Glean not configured, returning empty collections');
-      return { success: false, collections: [], error: 'Glean not enabled' };
-    }
+    
+    // In mock mode, allow fetching collections even if not fully configured
+    if (!config.devMode) {
+      if (!config.enabled) {
+        console.log('Glean not configured, returning empty collections');
+        return { success: false, collections: [], error: 'Glean not enabled' };
+      }
 
-    const hasToken = !!(config.apiToken || config.clientToken);
-    if (!config.domain || !hasToken) {
-      console.log('Missing domain or token');
-      return { success: false, collections: [], error: 'Missing domain or token' };
+      const hasToken = !!(config.apiToken || config.clientToken);
+      if (!config.domain || !hasToken) {
+        console.log('Missing domain or token');
+        return { success: false, collections: [], error: 'Missing domain or token' };
+      }
+    } else {
+      // Mock mode - use defaults if missing
+      if (!config.domain) {
+        config.domain = 'app.glean.com';
+      }
     }
 
     // Normalize domain and construct API URL
@@ -304,18 +331,23 @@ async function fetchGleanCollections() {
 
     // Use apiToken or clientToken
     const token = config.apiToken || config.clientToken;
-    const headers = createCollectionsAPIHeaders(token);
+    const tokenType = config.tokenType || 'glean-issued';
+    const headers = createCollectionsAPIHeaders(token, {}, tokenType);
 
     console.log('📡 Calling listCollections API:', listUrl);
 
     try {
-      const result = await fetchJSON(listUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({}), // Empty payload for listing
-        mode: 'cors',
-        credentials: 'omit',
-      });
+      const result = await fetchJSON(
+        listUrl,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({}), // Empty payload for listing
+          mode: 'cors',
+          credentials: 'omit',
+        },
+        { gleanConfig: config }
+      );
 
       console.log('✅ Collections API response:', result);
       
@@ -396,6 +428,54 @@ async function testGleanConnection() {
   try {
     const config = await getGleanConfig();
 
+    // In mock mode, allow testing without full config
+    if (config.devMode) {
+      console.log('🎭 Mock Mode: Testing connection with mock API');
+      // Use defaults for mock mode
+      const mockConfig = {
+        ...config,
+        domain: config.domain || 'app.glean.com',
+        apiToken: config.apiToken || 'mock-token',
+        enabled: true,
+      };
+      
+      // Test with mock API
+      const baseUrl = normalizeDomain(mockConfig.domain);
+      const testUrl = `${baseUrl}/rest/api/v1/listcollections`;
+      const token = mockConfig.apiToken;
+      const tokenType = mockConfig.tokenType || 'glean-issued';
+      const headers = createCollectionsAPIHeaders(token, {}, tokenType);
+      
+      try {
+        const result = await fetchJSON(
+          testUrl,
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({}),
+            mode: 'cors',
+            credentials: 'omit',
+          },
+          { gleanConfig: mockConfig }
+        );
+        
+        // Mock API should return collections
+        const collectionsCount = result.collections?.length || 0;
+        console.log('🎭 Mock Mode: Connection test successful!');
+        return {
+          success: true,
+          message: `🎭 Mock Mode: Successfully connected (found ${collectionsCount} mock collection(s))`,
+          collectionsCount,
+        };
+      } catch (error) {
+        console.error('🎭 Mock Mode: Error in test:', error);
+        return {
+          success: false,
+          error: `Mock mode test failed: ${error.message}`,
+        };
+      }
+    }
+
     // Check for token (apiToken or clientToken)
     const hasToken = !!(config.apiToken || config.clientToken);
 
@@ -424,6 +504,7 @@ async function testGleanConnection() {
 
     // Use apiToken or clientToken
     const token = config.apiToken || config.clientToken;
+    const tokenType = config.tokenType || 'glean-issued';
     
     // Debug logging (mask token for security)
     const tokenPreview = token ? `${token.substring(0, 8)}...${token.substring(token.length - 4)}` : 'NO TOKEN';
@@ -434,10 +515,11 @@ async function testGleanConnection() {
       tokenLength: token?.length || 0,
       tokenPreview,
       hasToken: !!token,
+      tokenType,
     });
 
-    // Create headers with OAuth auth type
-    const headers = createCollectionsAPIHeaders(token);
+    // Create headers with appropriate auth type
+    const headers = createCollectionsAPIHeaders(token, {}, tokenType);
     console.log('📋 Request Headers:', {
       'Content-Type': headers['Content-Type'],
       'Accept': headers['Accept'],
@@ -447,13 +529,17 @@ async function testGleanConnection() {
 
     try {
       // Test with listCollections - simpler endpoint that just requires auth
-      const result = await fetchJSON(testUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({}), // Empty payload for listing
-        mode: 'cors',
-        credentials: 'omit',
-      });
+      const result = await fetchJSON(
+        testUrl,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({}), // Empty payload for listing
+          mode: 'cors',
+          credentials: 'omit',
+        },
+        { gleanConfig: config }
+      );
 
       // Success - we got a response (even if empty collections list)
       console.log('Connection test successful! API is reachable and token is valid.');
@@ -464,6 +550,19 @@ async function testGleanConnection() {
         collectionsCount,
       };
     } catch (error) {
+      // Handle network errors first
+      if (error.message && (error.message.includes('timeout') || error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+        return {
+          success: false,
+          error: `Network error: Cannot reach Glean API.\n\nPossible causes:\n1. Not connected to VPN (required for Glean access)\n2. Network connection issue\n3. Glean domain incorrect\n\nTo test offline, enable "Mock API Mode" in Developer Options.`,
+          status: 'network_error',
+          details: {
+            url: testUrl,
+            errorMessage: error.message,
+          },
+        };
+      }
+      
       // Handle specific error statuses
       if (error.status === 401) {
         // Log more details for debugging
