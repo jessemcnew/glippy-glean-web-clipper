@@ -43,7 +43,21 @@ async function saveClip(clipData, collectionsSync, indexingSync) {
     if (collectionsSync) {
       try {
         const config = await getGleanConfig();
-        if (config.enabled && config.apiToken && config.collectionId) {
+        // In mock mode, allow sync even without full config
+        const canSync = config.devMode || (config.enabled && config.apiToken && config.collectionId);
+        if (canSync) {
+          // In mock mode, use defaults if missing
+          if (config.devMode) {
+            if (!config.apiToken) {
+              config.apiToken = 'mock-token-for-dev-mode'; // Mock token for testing
+            }
+            if (!config.collectionId) {
+              config.collectionId = '1'; // Use first mock collection
+            }
+            if (!config.collectionName) {
+              config.collectionName = 'Mock Collection 1';
+            }
+          }
           console.log('Attempting to sync to Glean Collections:', {
             clipId: clipData.id,
             title: clipData.title?.substring(0, 50) + '...',
@@ -90,7 +104,16 @@ async function saveClip(clipData, collectionsSync, indexingSync) {
         }
       } catch (error) {
         console.error('Collections API failed:', error.message);
-        hasError = true;
+        
+        // Check if it's a network error and provide helpful message
+        if (error.message && (error.message.includes('timeout') || error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+          console.warn('⚠️ Network error detected. Clip saved locally. Enable Mock API Mode for offline testing.');
+          // Don't mark as failed if it's a network error - queue for later
+          clipData.syncStatus = 'pending';
+          clipData.syncError = 'Network error - will retry when connection restored';
+        } else {
+          hasError = true;
+        }
       }
     }
 
@@ -110,7 +133,18 @@ async function saveClip(clipData, collectionsSync, indexingSync) {
         }
       } catch (error) {
         console.error('Indexing API failed:', error.message);
-        hasError = true;
+        
+        // Check if it's a network error
+        if (error.message && (error.message.includes('timeout') || error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+          console.warn('⚠️ Network error detected. Clip saved locally.');
+          // Don't mark as failed if it's a network error
+          if (clipData.syncStatus !== 'synced') {
+            clipData.syncStatus = 'pending';
+            clipData.syncError = 'Network error - will retry when connection restored';
+          }
+        } else {
+          hasError = true;
+        }
       }
     }
 
@@ -228,6 +262,8 @@ async function getGleanConfig() {
         indexingEnabled: config.indexingEnabled || false,
         indexingToken: config.indexingToken || '',
         datasource: config.datasource || 'WEBCLIPPER',
+        tokenType: config.tokenType || 'glean-issued', // 'oauth' or 'glean-issued'
+        devMode: config.devMode || false, // Mock API mode for offline development
       });
     });
   });

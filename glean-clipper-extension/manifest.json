@@ -5,6 +5,23 @@
   "description": "Clip web content to your personal Glean knowledge base",
 
   "permissions": ["activeTab", "storage", "contextMenus", "scripting", "identity"],
+  
+  "commands": {
+    "clip-selection": {
+      "suggested_key": {
+        "default": "Ctrl+K",
+        "mac": "Command+K"
+      },
+      "description": "Clip selected text (or current page if no selection)"
+    },
+    "clip-page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "Command+Shift+K"
+      },
+      "description": "Clip entire page"
+    }
+  },
 
   "host_permissions": ["http://*/*", "https://*/*", "https://linkedin-be.glean.com/*"],
 
