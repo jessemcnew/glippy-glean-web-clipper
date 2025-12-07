@@ -39,18 +39,63 @@ Once enabled, Linear will automatically:
    - ✅ **Show PRs in Linear** (optional)
    - ✅ **Update issue status on PR merge** (optional)
 
-### 4. Configure Issue Linking
+### 4. Enable Commit Linking (Magic Words)
 
-Linear will automatically detect issue references in commit messages:
-- Format: `[GLE-XXX]` in commit message
-- Example: `feat(extension): Add keyboard shortcuts [GLE-8]`
+**On the GitHub integration settings page you're viewing:**
 
-**Auto-linking works when:**
-- Commit message contains `[GLE-XXX]` pattern
-- Repository is connected in Linear
-- Integration is enabled
+1. Scroll down to the section **"Link commits to issues with magic words"**
+2. **Toggle the switch ON** (it should turn blue when enabled)
+3. This enables automatic commit linking
 
-### 5. Verify Setup
+**Important Note on Magic Words Format:**
+
+Linear's default magic words are:
+- `Fixes ID-123` or `Part of ID-123` (where `ID-123` is the issue identifier)
+
+However, we use bracket notation: `[GLE-XXX]`
+
+**You have two options:**
+
+**Option A: Use Linear's default format** (recommended for auto-linking)
+- Change commit format to: `feat(extension): Add keyboard shortcuts Fixes GLE-8`
+- Or: `feat(extension): Add keyboard shortcuts Part of GLE-8`
+
+**Option B: Keep bracket format** (may require manual linking)
+- Keep using: `feat(extension): Add keyboard shortcuts [GLE-8]`
+- Commits may not auto-link, but you can manually link them
+- The Git hook and GitHub Action will still extract `[GLE-XXX]` references
+
+**Recommendation:** Try Option A first to see if Linear recognizes `Fixes GLE-8` or `Part of GLE-8` format. If it works, we can update our commit convention.
+
+### 5. Set Up GitHub Webhook
+
+**Linear will show a modal with webhook setup instructions. Follow these steps:**
+
+1. **Copy the webhook details** from the Linear modal:
+   - Payload URL (starts with `https://client-api.linear.app/connect/github...`)
+   - Secret (a long hexadecimal string)
+
+2. **Open GitHub in a new tab**:
+   - Go to: `https://github.com/jessemcnew/glippy-glean-web-clipper/settings/hooks`
+   - Or: Repository → Settings → Webhooks
+
+3. **Add the webhook**:
+   - Click **"Add webhook"** button (top right)
+   - Paste the **Payload URL** from Linear
+   - Set **Content type** to: `application/json`
+   - Paste the **Secret** from Linear
+   - **Leave all other settings as default** (don't change events, SSL verification, etc.)
+   - Click **"Add webhook"**
+
+4. **Verify webhook is active**:
+   - You should see a green checkmark next to the webhook
+   - Linear will receive commit/PR events from GitHub
+
+**Note:** If you plan to link multiple repositories, set up the webhook at the **organization level** instead:
+- Go to: `https://github.com/organizations/jessemcnew/settings/hooks`
+- Follow the same steps above
+
+### 6. Verify Setup
 
 1. Make a test commit with Linear reference:
    ```bash
