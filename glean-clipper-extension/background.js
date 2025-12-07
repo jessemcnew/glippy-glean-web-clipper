@@ -23,6 +23,315 @@ initializeServiceWorker();
 // Initialize UI components (context menus, etc.)
 initializeUI();
 
+// Handle keyboard shortcuts
+chrome.commands.onCommand.addListener((command) => {
+  console.log('Command received:', command);
+  
+  if (command === 'clip-selection' || command === 'clip-page') {
+    // Get the active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs.length === 0) return;
+      
+      const tab = tabs[0];
+      
+      if (command === 'clip-selection') {
+        // Clip selection (or page if no selection)
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          function: clipSelectionOrPage,
+        }).catch(err => console.error('Failed to execute clip-selection:', err));
+      } else if (command === 'clip-page') {
+        // Clip entire page
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          function: clipEntirePageFromShortcut,
+        }).catch(err => console.error('Failed to execute clip-page:', err));
+      }
+    });
+  }
+});
+
+// Function to clip selection or page (injected into page context)
+// Must be defined as a separate function that can be serialized
+function clipSelectionOrPage() {
+  const selection = window.getSelection();
+  const hasSelection = selection.rangeCount > 0 && selection.toString().trim();
+  
+  // Helper functions (defined inline since they can't be imported)
+  function getFaviconForClip() {
+    const faviconLink = document.querySelector('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
+    if (faviconLink && faviconLink.href) {
+      if (faviconLink.href.startsWith('/')) {
+        return window.location.origin + faviconLink.href;
+      }
+      if (!faviconLink.href.startsWith('http')) {
+        return window.location.origin + '/' + faviconLink.href;
+      }
+      return faviconLink.href;
+    }
+    return `https://www.google.com/s2/favicons?domain=${window.location.hostname}&sz=16`;
+  }
+
+  function cleanClipTextForClip(text) {
+    if (!text) return '';
+    const lines = text.split('\n').filter(line => {
+      const trimmed = line.trim();
+      if (trimmed.match(/^https?:\/\//)) return false;
+      if (trimmed.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) return false;
+      if (trimmed.match(/^(Images?|Clipped?|Source?|Domain?):/i)) return false;
+      if (trimmed.length > 200) return false;
+      return true;
+    });
+    const meaningfulLines = lines.filter(l => l.trim().length > 10).slice(0, 5);
+    if (meaningfulLines.length === 0) {
+      return text.substring(0, 200).trim();
+    }
+    return meaningfulLines.join('\n').substring(0, 500).trim();
+  }
+
+  function showClipFeedback(message, type = 'success') {
+    // Remove any existing feedback
+    const existing = document.getElementById('glean-clip-feedback');
+    if (existing) existing.remove();
+
+    const feedback = document.createElement('div');
+    feedback.id = 'glean-clip-feedback';
+    feedback.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 999999;
+      background: ${type === 'error' ? '#EF4444' : '#10B981'};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      animation: gleanSlideIn 0.3s ease;
+      pointer-events: none;
+    `;
+
+    feedback.textContent = message;
+    document.body.appendChild(feedback);
+
+    // Add animation styles if not already present
+    if (!document.getElementById('glean-clip-feedback-styles')) {
+      const style = document.createElement('style');
+      style.id = 'glean-clip-feedback-styles';
+      style.textContent = `
+        @keyframes gleanSlideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes gleanSlideOut {
+          from { transform: translateX(0); opacity: 1; }
+          to { transform: translateX(100%); opacity: 0; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    setTimeout(() => {
+      feedback.style.animation = 'gleanSlideOut 0.3s ease forwards';
+      setTimeout(() => feedback.remove(), 300);
+    }, 2000);
+  }
+  
+  if (hasSelection) {
+    // Clip selected text
+    const selectedText = selection.toString().trim();
+    const favicon = getFaviconForClip();
+    const cleanedText = cleanClipTextForClip(selectedText);
+    
+    chrome.runtime.sendMessage({
+      action: 'saveClip',
+      data: {
+        url: window.location.href,
+        title: document.title,
+        selectedText: cleanedText,
+        context: selection.getRangeAt(0).commonAncestorContainer.textContent?.substring(0, 300),
+        timestamp: new Date().toISOString(),
+        domain: window.location.hostname,
+        favicon: favicon,
+      },
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        showClipFeedback('Failed to clip: ' + chrome.runtime.lastError.message, 'error');
+        return;
+      }
+      if (response && response.success) {
+        showClipFeedback('✓ Clipped to Glean!');
+      } else if (response && response.error) {
+        showClipFeedback('Failed: ' + response.error, 'error');
+      } else {
+        showClipFeedback('✓ Clipped to Glean!');
+      }
+    });
+  } else {
+    // No selection, clip entire page
+    const mainContent = document.querySelector('main, article, .content, #content') || document.body;
+    const favicon = getFaviconForClip();
+    const heading = document.querySelector('h1, h2, .headline, .title, article h1')?.textContent?.trim() || document.title;
+    const firstParagraph = document.querySelector('article p, .content p, main p')?.textContent?.trim() || '';
+    
+    let cleanedText = '';
+    if (heading && firstParagraph) {
+      cleanedText = `${heading}\n\n${cleanClipTextForClip(firstParagraph)}`;
+    } else {
+      cleanedText = cleanClipTextForClip(mainContent.textContent?.trim() || '');
+    }
+    
+    chrome.runtime.sendMessage({
+      action: 'saveClip',
+      data: {
+        url: window.location.href,
+        title: document.title,
+        selectedText: cleanedText.substring(0, 1000),
+        context: 'Full page clip',
+        timestamp: new Date().toISOString(),
+        domain: window.location.hostname,
+        favicon: favicon,
+      },
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        showClipFeedback('Failed to clip: ' + chrome.runtime.lastError.message, 'error');
+        return;
+      }
+      if (response && response.success) {
+        showClipFeedback('✓ Clipped to Glean!');
+      } else if (response && response.error) {
+        showClipFeedback('Failed: ' + response.error, 'error');
+      } else {
+        showClipFeedback('✓ Clipped to Glean!');
+      }
+    });
+  }
+}
+
+// Function to clip entire page (injected into page context)
+function clipEntirePageFromShortcut() {
+  // Helper functions (defined inline)
+  function getFaviconForClip() {
+    const faviconLink = document.querySelector('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
+    if (faviconLink && faviconLink.href) {
+      if (faviconLink.href.startsWith('/')) {
+        return window.location.origin + faviconLink.href;
+      }
+      if (!faviconLink.href.startsWith('http')) {
+        return window.location.origin + '/' + faviconLink.href;
+      }
+      return faviconLink.href;
+    }
+    return `https://www.google.com/s2/favicons?domain=${window.location.hostname}&sz=16`;
+  }
+
+  function cleanClipTextForClip(text) {
+    if (!text) return '';
+    const lines = text.split('\n').filter(line => {
+      const trimmed = line.trim();
+      if (trimmed.match(/^https?:\/\//)) return false;
+      if (trimmed.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) return false;
+      if (trimmed.match(/^(Images?|Clipped?|Source?|Domain?):/i)) return false;
+      if (trimmed.length > 200) return false;
+      return true;
+    });
+    const meaningfulLines = lines.filter(l => l.trim().length > 10).slice(0, 5);
+    if (meaningfulLines.length === 0) {
+      return text.substring(0, 200).trim();
+    }
+    return meaningfulLines.join('\n').substring(0, 500).trim();
+  }
+
+  function showClipFeedback(message, type = 'success') {
+    // Remove any existing feedback
+    const existing = document.getElementById('glean-clip-feedback');
+    if (existing) existing.remove();
+
+    const feedback = document.createElement('div');
+    feedback.id = 'glean-clip-feedback';
+    feedback.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 999999;
+      background: ${type === 'error' ? '#EF4444' : '#10B981'};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      animation: gleanSlideIn 0.3s ease;
+      pointer-events: none;
+    `;
+
+    feedback.textContent = message;
+    document.body.appendChild(feedback);
+
+    // Add animation styles if not already present
+    if (!document.getElementById('glean-clip-feedback-styles')) {
+      const style = document.createElement('style');
+      style.id = 'glean-clip-feedback-styles';
+      style.textContent = `
+        @keyframes gleanSlideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes gleanSlideOut {
+          from { transform: translateX(0); opacity: 1; }
+          to { transform: translateX(100%); opacity: 0; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    setTimeout(() => {
+      feedback.style.animation = 'gleanSlideOut 0.3s ease forwards';
+      setTimeout(() => feedback.remove(), 300);
+    }, 2000);
+  }
+  
+  const mainContent = document.querySelector('main, article, .content, #content') || document.body;
+  const favicon = getFaviconForClip();
+  const heading = document.querySelector('h1, h2, .headline, .title, article h1')?.textContent?.trim() || document.title;
+  const firstParagraph = document.querySelector('article p, .content p, main p')?.textContent?.trim() || '';
+  
+  let cleanedText = '';
+  if (heading && firstParagraph) {
+    cleanedText = `${heading}\n\n${cleanClipTextForClip(firstParagraph)}`;
+  } else {
+    cleanedText = cleanClipTextForClip(mainContent.textContent?.trim() || '');
+  }
+  
+  chrome.runtime.sendMessage({
+    action: 'saveClip',
+    data: {
+      url: window.location.href,
+      title: document.title,
+      selectedText: cleanedText.substring(0, 1000),
+      context: 'Full page clip',
+      timestamp: new Date().toISOString(),
+      domain: window.location.hostname,
+      favicon: favicon,
+    },
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      showClipFeedback('Failed to clip: ' + chrome.runtime.lastError.message, 'error');
+      return;
+    }
+    if (response && response.success) {
+      showClipFeedback('✓ Clipped to Glean!');
+    } else if (response && response.error) {
+      showClipFeedback('Failed: ' + response.error, 'error');
+    } else {
+      showClipFeedback('✓ Clipped to Glean!');
+    }
+  });
+}
+
 // PING listener for keepalive (must be top-level, synchronous)
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === 'PING') {
