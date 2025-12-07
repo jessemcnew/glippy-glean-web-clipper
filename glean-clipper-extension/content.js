@@ -162,12 +162,35 @@ function hideClipButton() {
   }
 }
 
-// Handle text selection
+// Handle text selection - make it less intrusive
+// Only show button if user holds a modifier key or if enabled in settings
+let showFloatingButton = false; // Default to false for less intrusive experience
+
+// Check if floating button should be enabled
+chrome.storage.local.get(['gleanConfig'], (result) => {
+  const config = result.gleanConfig || {};
+  showFloatingButton = config.showFloatingButton || false; // Default to disabled
+});
+
+// Handle text selection - only show if enabled
 document.addEventListener('mouseup', e => {
+  // Only show if enabled AND user is holding a modifier key (Shift, Alt, or Ctrl/Cmd)
+  const hasModifier = e.shiftKey || e.altKey || e.ctrlKey || e.metaKey;
+  
+  if (!showFloatingButton && !hasModifier) {
+    hideClipButton();
+    return;
+  }
+  
   setTimeout(() => {
     const selection = window.getSelection();
     if (selection.rangeCount > 0 && selection.toString().trim()) {
-      showClipButton(selection);
+      // Only show if enabled OR modifier key is held
+      if (showFloatingButton || hasModifier) {
+        showClipButton(selection);
+      } else {
+        hideClipButton();
+      }
     } else {
       hideClipButton();
     }

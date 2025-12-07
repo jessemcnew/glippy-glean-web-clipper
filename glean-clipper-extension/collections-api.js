@@ -30,20 +30,25 @@ class GleanCollectionsAPI {
 
     const url = `${this.baseUrl}/rest/api/v1/${endpoint}`;
 
-    // Use unified header creation with OAuth auth type
-    const headers = createCollectionsAPIHeaders(this.config.apiToken);
+    // Use unified header creation with appropriate auth type
+    const tokenType = this.config.tokenType || 'glean-issued';
+    const headers = createCollectionsAPIHeaders(this.config.apiToken, {}, tokenType);
 
     console.log(`📡 Collections API Request: ${method} ${url}`);
     console.log('📦 Request data:', data);
 
     try {
-      const result = await fetchJSON(url, {
-        method,
-        headers,
-        body: data ? JSON.stringify(data) : null,
-        mode: 'cors',
-        credentials: 'omit',
-      });
+      const result = await fetchJSON(
+        url,
+        {
+          method,
+          headers,
+          body: data ? JSON.stringify(data) : null,
+          mode: 'cors',
+          credentials: 'omit',
+        },
+        { gleanConfig: this.config }
+      );
 
       console.log('✅ Parsed API response:', result);
       return result;
@@ -179,3 +184,4 @@ export { GleanCollectionsAPI };
 if (typeof window !== 'undefined') {
   window.GleanCollectionsAPI = GleanCollectionsAPI;
 }
+
