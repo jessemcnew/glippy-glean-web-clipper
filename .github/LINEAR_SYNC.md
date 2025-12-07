@@ -73,10 +73,10 @@ Set up Linear webhooks to:
 
 ## Current Status
 
-✅ **Commit validation** - Husky hook warns about missing Linear references
-✅ **Commit convention** - Documented in `.github/COMMIT_CONVENTION.md`
-✅ **CHANGELOG sync** - All changes reference Linear issues
-✅ **AI updates** - I update Linear directly when working
+✅ **Commit validation** - Husky hook warns about missing Linear references  
+✅ **Commit convention** - Documented in `.github/COMMIT_CONVENTION.md`  
+✅ **CHANGELOG sync** - All changes reference Linear issues  
+✅ **AI updates** - I update Linear directly when working  
 ⏳ **Auto-sync** - Placeholder GitHub Action (needs Linear API key or integration)
 
 ## Next Steps
