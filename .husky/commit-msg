@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Validate commit message format (warn if missing Linear reference, but don't block)
+commit_msg=$(cat "$1")
+
+# Check if commit message contains Linear issue reference [GLE-XXX]
+if ! echo "$commit_msg" | grep -qE '\[GLE-[0-9]+\]'; then
+  echo ""
+  echo "⚠️  WARNING: Commit message doesn't reference a Linear issue [GLE-XXX]"
+  echo "   Linear is our source of truth - consider adding an issue reference."
+  echo "   Format: <type>(<scope>): <subject> [GLE-XXX]"
+  echo "   See .github/COMMIT_CONVENTION.md for details"
+  echo ""
+  echo "   Continue anyway? (This is just a warning, not blocking)"
+  echo ""
+fi
+

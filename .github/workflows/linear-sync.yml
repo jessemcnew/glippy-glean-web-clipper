@@ -1,0 +1,61 @@
+name: Linear Sync
+
+on:
+  push:
+    branches:
+      - main
+      - phase-1-implementation
+      - 'feature/**'
+      - 'fix/**'
+
+jobs:
+  sync-to-linear:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Linear issue IDs from commits
+        id: extract-issues
+        run: |
+          # Get commits since last run (or last 10 commits for first run)
+          COMMITS=$(git log --oneline -10 --format="%H %s")
+          
+          # Extract all GLE-XXX references
+          ISSUES=$(echo "$COMMITS" | grep -oE '\[GLE-[0-9]+\]' | sort -u | tr '\n' ' ')
+          
+          echo "issues=$ISSUES" >> $GITHUB_OUTPUT
+          echo "Found Linear issues: $ISSUES"
+
+      - name: Comment on Linear issues
+        if: steps.extract-issues.outputs.issues != ''
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          # Note: This requires a Linear API key in GitHub secrets
+          # For now, this is a placeholder - you can enhance it with actual Linear API calls
+          # or use Linear's GitHub integration if available
+          
+          echo "Would comment on Linear issues: ${{ steps.extract-issues.outputs.issues }}"
+          echo ""
+          echo "To enable full sync:"
+          echo "1. Create a Linear API key"
+          echo "2. Add it to GitHub Secrets as LINEAR_API_KEY"
+          echo "3. Update this workflow to make actual Linear API calls"
+          echo ""
+          echo "Alternatively, use Linear's built-in GitHub integration:"
+          echo "https://linear.app/settings/integrations/github"
+
+      - name: Summary
+        run: |
+          echo "## Linear Sync Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Commits in this push reference:" >> $GITHUB_STEP_SUMMARY
+          echo "- ${{ steps.extract-issues.outputs.issues }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note**: Full auto-sync requires Linear API key or GitHub integration setup" >> $GITHUB_STEP_SUMMARY
+
