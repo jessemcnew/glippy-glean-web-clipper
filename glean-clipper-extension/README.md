@@ -87,6 +87,8 @@ You have two options:
 
 ## Testing & Troubleshooting
 
+> **💡 Quick Testing Guide**: See [SERVICE_WORKER_TESTING.md](./SERVICE_WORKER_TESTING.md) for a guide on testing the extension with real-time service worker log monitoring.
+
 ### Test the API Connection
 
 Use the provided Python test script:
