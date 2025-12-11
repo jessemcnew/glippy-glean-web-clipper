@@ -106,8 +106,14 @@ async function syncToGleanCollections(clip, config) {
     itemDescriptor.documentId = clip.documentId;
   }
   
+  // Ensure collectionId is a valid number
+  const collectionId = parseInt(config.collectionId, 10);
+  if (isNaN(collectionId) || collectionId <= 0) {
+    throw new Error(`Invalid collection ID: ${config.collectionId}. Collection ID must be a positive number.`);
+  }
+
   const payload = {
-    collectionId: parseInt(config.collectionId),
+    collectionId: collectionId,
     addedCollectionItemDescriptors: [itemDescriptor],
   };
 
