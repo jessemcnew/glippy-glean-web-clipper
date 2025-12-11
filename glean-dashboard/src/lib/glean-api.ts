@@ -2,6 +2,7 @@ interface GleanConfig {
   baseUrl: string
   apiKey?: string
   domain?: string
+  authMethod?: 'oauth' | 'manual'
 }
 
 interface GleanSearchResponse {
@@ -51,12 +52,22 @@ export class GleanAPI {
 
   private async searchViaMCP(query: string, options: any): Promise<GleanSearchResponse> {
     try {
+      // Build headers with OAuth support
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }
+      if (this.config.apiKey) {
+        headers['Authorization'] = `Bearer ${this.config.apiKey}`
+        // Add OAuth header if token is from OAuth flow
+        if (this.config.authMethod === 'oauth') {
+          headers['X-Glean-Auth-Type'] = 'OAUTH'
+        }
+      }
+
       const response = await fetch(`${this.config.baseUrl}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
-        },
+        headers,
         body: JSON.stringify({
           method: 'search',
           params: {
@@ -86,12 +97,22 @@ export class GleanAPI {
         pageToken: options.offset?.toString() || '0'
       })
 
+      // Build headers with OAuth support
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }
+      if (this.config.apiKey) {
+        headers['Authorization'] = `Bearer ${this.config.apiKey}`
+        // Add OAuth header if token is from OAuth flow
+        if (this.config.authMethod === 'oauth') {
+          headers['X-Glean-Auth-Type'] = 'OAUTH'
+        }
+      }
+
       const response = await fetch(`${this.config.baseUrl}/api/index/v1/search?${searchParams}`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'Content-Type': 'application/json'
-        }
+        headers,
       })
 
       if (!response.ok) {
@@ -133,14 +154,32 @@ export class GleanAPI {
 }
 
 // Factory function for easy setup
-export function createGleanAPI(domain: string, apiKey?: string): GleanAPI {
-  // Try remote MCP server first (simpler setup)
-  const mcpUrl = `https://${domain.replace('.glean.com', '')}-be.glean.com/mcp`
+export function createGleanAPI(domain: string, apiKey?: string, authMethod?: 'oauth' | 'manual'): GleanAPI {
+  // Normalize domain to backend format (matching extension logic)
+  let backendDomain: string
+  if (domain.includes('-be.glean.com')) {
+    // Already a backend domain
+    backendDomain = domain
+  } else if (domain === 'app.glean.com' || domain.startsWith('app.')) {
+    // Special case: app.glean.com -> linkedin-be.glean.com
+    backendDomain = 'linkedin-be.glean.com'
+  } else if (domain.endsWith('.glean.com')) {
+    // customer.glean.com -> customer-be.glean.com
+    const company = domain.replace('.glean.com', '')
+    backendDomain = `${company}-be.glean.com`
+  } else {
+    // Fallback: add -be suffix
+    backendDomain = `${domain}-be.glean.com`
+  }
+  
+  // Use direct Glean API endpoint
+  const baseUrl = `https://${backendDomain}`
   
   return new GleanAPI({
-    baseUrl: mcpUrl,
+    baseUrl,
     domain,
-    apiKey
+    apiKey,
+    authMethod
   })
 }
 
