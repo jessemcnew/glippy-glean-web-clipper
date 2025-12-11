@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Glean Web Clipper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #1a1a1a;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        
+        .last-updated {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 30px;
+        }
+        
+        h2 {
+            color: #2c3e50;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        
+        h3 {
+            color: #34495e;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        p {
+            margin-bottom: 15px;
+            color: #555;
+        }
+        
+        ul, ol {
+            margin-left: 30px;
+            margin-bottom: 15px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+            color: #555;
+        }
+        
+        strong {
+            color: #2c3e50;
+        }
+        
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        .note {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            h2 {
+                font-size: 1.3em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Privacy Policy for Glean Web Clipper</h1>
+        <p class="last-updated"><strong>Last Updated:</strong> December 2024</p>
+
+        <h2>Overview</h2>
+        <p>Glean Web Clipper ("the Extension") is a browser extension that allows users to save web content to their Glean knowledge base. This privacy policy explains how we handle user data.</p>
+
+        <h2>Data Collection and Use</h2>
+
+        <h3>Data Stored Locally</h3>
+        <p>The Extension stores the following data <strong>locally on your device</strong> using Chrome's storage API:</p>
+        <ul>
+            <li><strong>Clips:</strong> Web page URLs, titles, selected text, and metadata you choose to save</li>
+            <li><strong>Configuration:</strong> Your Glean API tokens, domain settings, and collection preferences</li>
+            <li><strong>Saved Prompts:</strong> Prompts you create and save for future use</li>
+            <li><strong>Auto Collections Rules:</strong> Rules you configure for automatically organizing clips</li>
+        </ul>
+        <p><strong>This data is stored only on your device and is never transmitted to us or any third party except Glean when you explicitly sync clips.</strong></p>
+
+        <h3>Data Transmitted to Glean</h3>
+        <p>When you choose to sync clips to Glean:</p>
+        <ul>
+            <li>Clip content (title, text, URL) is sent to your Glean instance</li>
+            <li>Your Glean API token is used for authentication</li>
+            <li>Data is sent only to the Glean domain you configure</li>
+        </ul>
+        <p><strong>We do not have access to your Glean data or API tokens.</strong></p>
+
+        <h3>Data Transmitted to Slack (Optional)</h3>
+        <p>If you choose to use the Slack integration:</p>
+        <ul>
+            <li>Clip content you select to share is sent to Slack</li>
+            <li>Your Slack OAuth token is stored locally</li>
+            <li>Data is sent only to Slack channels you select</li>
+        </ul>
+        <p><strong>We do not have access to your Slack data or tokens.</strong></p>
+
+        <h2>Third-Party Services</h2>
+
+        <h3>Glean</h3>
+        <p>The Extension integrates with Glean, a knowledge management platform. When you sync clips:</p>
+        <ul>
+            <li>Data is sent directly to your Glean instance</li>
+            <li>Authentication uses your Glean API credentials</li>
+            <li>We do not intercept or store this data</li>
+        </ul>
+
+        <h3>Slack (Optional)</h3>
+        <p>The Extension can share clips to Slack if you connect your Slack workspace:</p>
+        <ul>
+            <li>Uses Slack OAuth for authentication</li>
+            <li>Only shares content you explicitly choose to share</li>
+            <li>We do not access your Slack data</li>
+        </ul>
+
+        <h2>Permissions Usage</h2>
+        <p>The Extension requests the following permissions:</p>
+        <ul>
+            <li><strong>activeTab:</strong> To access the current tab's URL and title when clipping</li>
+            <li><strong>storage:</strong> To save clips and settings locally on your device</li>
+            <li><strong>contextMenus:</strong> To add right-click menu options for clipping</li>
+            <li><strong>scripting:</strong> To inject content scripts for text selection</li>
+            <li><strong>identity:</strong> For OAuth authentication with Glean (optional)</li>
+            <li><strong>host_permissions:</strong> To access web pages for clipping content</li>
+        </ul>
+        <p><strong>All permissions are used solely for the Extension's core functionality.</strong></p>
+
+        <h2>Data Security</h2>
+        <ul>
+            <li>All data is stored locally on your device</li>
+            <li>API tokens are stored using Chrome's secure storage API</li>
+            <li>Data transmitted to Glean/Slack uses HTTPS encryption</li>
+            <li>We do not collect, store, or transmit any data to our servers</li>
+        </ul>
+
+        <h2>User Rights</h2>
+        <p>You have full control over your data:</p>
+        <ul>
+            <li>All clips are stored locally and can be deleted at any time</li>
+            <li>You can disconnect Glean/Slack integrations at any time</li>
+            <li>You can clear all extension data through Chrome's extension settings</li>
+            <li>No data is collected without your explicit action</li>
+        </ul>
+
+        <h2>Children's Privacy</h2>
+        <p>The Extension is not intended for users under 13 years of age. We do not knowingly collect data from children.</p>
+
+        <h2>Changes to This Policy</h2>
+        <p>We may update this privacy policy. Changes will be posted with an updated "Last Updated" date.</p>
+
+        <h2>Contact</h2>
+        <p>For questions about this privacy policy, please contact your Glean administrator or visit <a href="https://developers.glean.com" target="_blank" rel="noopener noreferrer">Glean Support</a>.</p>
+
+        <h2>Data Deletion</h2>
+        <p>To delete all Extension data:</p>
+        <ol>
+            <li>Open Chrome Settings → Extensions</li>
+            <li>Find "Glean Web Clipper"</li>
+            <li>Click "Remove" or use "Clear storage" option</li>
+        </ol>
+        <p>All locally stored data will be permanently deleted.</p>
+
+        <div class="note">
+            <p><strong>Note:</strong> This Extension is a tool for saving content to your Glean knowledge base. All data remains under your control and is stored locally or sent only to services you explicitly configure.</p>
+        </div>
+    </div>
+</body>
+</html>
