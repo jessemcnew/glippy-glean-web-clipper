@@ -189,7 +189,8 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       return false; // Synchronous response
 
     case 'fetchCollectionItems':
-      fetchCollectionItems(request.collectionId, await getGleanConfig())
+      getGleanConfig()
+        .then(config => fetchCollectionItems(request.collectionId, config))
         .then(result => sendResponse(result))
         .catch(error => sendResponse({ success: false, items: [], error: error.message }));
       return true;
@@ -201,19 +202,22 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       return true;
 
     case 'searchGleanAgents':
-      searchGleanAgents(request.query || '', await getGleanConfig())
+      getGleanConfig()
+        .then(config => searchGleanAgents(request.query || '', config))
         .then(result => sendResponse(result))
         .catch(error => sendResponse({ success: false, agents: [], error: error.message }));
       return true;
 
     case 'runGleanAgent':
-      runGleanAgent(request.agentId, request.input || {}, await getGleanConfig())
+      getGleanConfig()
+        .then(config => runGleanAgent(request.agentId, request.input || {}, config))
         .then(result => sendResponse(result))
         .catch(error => sendResponse({ success: false, articles: [], error: error.message }));
       return true;
 
     case 'findSimilarArticles':
-      findSimilarArticles(request.article || {}, await getGleanConfig())
+      getGleanConfig()
+        .then(config => findSimilarArticles(request.article || {}, config))
         .then(result => sendResponse(result))
         .catch(error => sendResponse({ success: false, articles: [], error: error.message }));
       return true;
