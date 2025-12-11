@@ -33,8 +33,8 @@ let collectionsAPI = null;
 let searchInput, clipsContainer, emptyState, clipCount;
 
 // Helper to get element safely
-// Expected missing elements in new UI: search-input, stats, filters, collections-count
-const EXPECTED_MISSING_ELEMENTS = new Set(['search-input', 'stats', 'filters', 'collections-count']);
+// Expected missing elements in new UI: search-input, stats, filters, collections-count, settings-btn, clear-synced-clips-btn
+const EXPECTED_MISSING_ELEMENTS = new Set(['search-input', 'stats', 'filters', 'collections-count', 'settings-btn', 'clear-synced-clips-btn']);
 
 function getElement(id) {
   const el = document.getElementById(id);
@@ -97,7 +97,7 @@ async function saveClipsToStorage() {
   try {
     if (isChromeExtension()) {
       await chrome.storage.local.set({ clips: allClips });
-      console.log('Clips saved to storage');
+      // Clips saved to storage
     }
   } catch (error) {
     console.error('Failed to save clips:', error);
@@ -347,7 +347,8 @@ async function loadSettings() {
         enabled: true,
       };
 
-      console.log('Loaded config from storage:', {
+      // Loaded config from storage
+      console.debug('Loaded config from storage:', {
         hasDomain: !!config.domain,
         hasApiToken: !!config.apiToken,
         hasClientToken: !!config.clientToken,
@@ -392,13 +393,13 @@ async function loadSettings() {
         // Set value immediately if we have it
         if (config.collectionId) {
         collectionSelect.value = config.collectionId;
-          console.log('Set collection ID from config:', config.collectionId);
+          // Set collection ID from config
         }
         // Also set up a listener to update when dropdown changes (only once)
         if (!collectionSelect.hasAttribute('data-listener-added')) {
           collectionSelect.setAttribute('data-listener-added', 'true');
           collectionSelect.addEventListener('change', () => {
-            console.log('Collection dropdown changed to:', collectionSelect.value);
+            // Collection dropdown changed
           });
         }
       }
@@ -430,17 +431,14 @@ async function loadSettings() {
 }
 
 function toggleSettings() {
-  // In new UI, settings is a tab, so switch to settings tab
-  const settingsTab = document.querySelector('.tab-btn[data-tab="settings"]');
-  if (settingsTab) {
-    settingsTab.click();
-  } else {
-    // Fallback for old UI
   const settingsPanel = document.getElementById('settings-panel');
   if (settingsPanel) {
     settingsPanel.classList.toggle('active');
-    }
+    return;
   }
+  // Legacy fallback (tabs)
+  const settingsTab = document.querySelector('.tab-btn[data-tab="settings"]');
+  if (settingsTab) settingsTab.click();
 }
 
 async function saveSettings() {
@@ -464,10 +462,10 @@ async function saveSettings() {
       const result = await chrome.storage.local.get(['gleanConfig']);
       if (result.gleanConfig?.clientToken) {
         clientToken = result.gleanConfig.clientToken.trim();
-        console.log('Using saved token from storage');
+        // Using saved token from storage
       } else if (result.gleanConfig?.apiToken) {
         clientToken = result.gleanConfig.apiToken.trim();
-        console.log('Using saved apiToken from storage');
+        // Using saved apiToken from storage
       }
     } catch (e) {
       console.warn('Could not read from storage:', e);
@@ -489,13 +487,6 @@ async function saveSettings() {
   let collectionId = '';
   if (collectionIdElement) {
     collectionId = collectionIdElement.value ? collectionIdElement.value.trim() : '';
-    console.log('SAVE SETTINGS - Collection ID from select:', {
-      element: collectionIdElement,
-      value: collectionIdElement.value,
-      trimmed: collectionId,
-      hasValue: !!collectionId,
-    });
-    
     // If still empty, try to get from search input's selected item
     if (!collectionId) {
       const searchInput = getElement('collection-search-input');
@@ -506,13 +497,10 @@ async function saveSettings() {
         if (matchingCollection) {
           collectionId = String(matchingCollection.id);
           collectionIdElement.value = collectionId;
-          console.log('Found collection ID from search input:', collectionId);
         }
       }
     }
   }
-  
-  console.log('SAVE SETTINGS - Final Collection ID:', collectionId);
   const enabledEl = getElement('glean-enabled');
   const enabled = enabledEl ? enabledEl.checked : false;
 
@@ -548,6 +536,9 @@ async function saveSettings() {
     }
   }
 
+  // Get existing config to preserve authMethod if it was set via OAuth
+  const existingConfig = await chrome.storage.local.get(['gleanConfig']).then(r => r.gleanConfig || {});
+  
   // Save configuration - tokens must come from storage only, never hardcoded
   const config = {
     domain,
@@ -555,29 +546,18 @@ async function saveSettings() {
     clientToken, // Collections API token (from UI) - alias for compatibility
     collectionId: collectionId || '', // Save empty string if not provided (don't use undefined)
     enabled,
-    // Preserve authMethod if already set
-    authMethod: clientToken ? 'oauth' : undefined,
-    // Note: Indexing token should be configured separately if needed
-    // indexingToken and indexingEnabled are optional and stored separately
+    // Preserve authMethod only if it was previously set to 'oauth' (from OAuth flow)
+    // Manual token entry should NOT set authMethod to 'oauth'
+    authMethod: existingConfig.authMethod === 'oauth' ? 'oauth' : undefined,
+    // Preserve other optional settings
+    indexingEnabled: existingConfig.indexingEnabled || false,
+    indexingToken: existingConfig.indexingToken || '',
+    datasource: existingConfig.datasource || 'WEBCLIPPER',
   };
-
-  console.log('Attempting to save config:', {
-    hasDomain: !!domain,
-    hasApiToken: !!clientToken,
-    hasCollectionId: !!collectionId,
-    enabled,
-    fullDomain: domain,
-    collectionIdValue: collectionId,
-  });
 
   try {
     if (isChromeExtension()) {
       await chrome.storage.local.set({ gleanConfig: config });
-      console.log('✅ Settings saved to Chrome storage successfully');
-
-      // Verify the save worked
-      const verification = await chrome.storage.local.get(['gleanConfig']);
-      console.log('Verification - saved config:', verification.gleanConfig);
     } else {
       console.log('Settings would be saved:', config);
     }
@@ -588,7 +568,7 @@ async function saveSettings() {
     if (isChromeExtension()) {
       try {
         await safeRuntimeSendMessage({ action: 'refreshCollections' });
-        console.log('Collections API refreshed with new settings');
+        // Collections API refreshed with new settings
         await initializeCollections(); // Re-initialize in popup too
         // Ensure collection dropdown is populated with current selection preserved
         populateSettingsCollectionDropdown();
@@ -639,6 +619,16 @@ function updateConnectionStatus(config) {
 
 // Setup event listeners (updated)
 function setupEventListeners() {
+  const settingsDrawer = document.getElementById('settings-panel');
+  const settingsClose = document.getElementById('settings-close');
+
+  const showSettings = () => {
+    if (settingsDrawer) settingsDrawer.classList.add('active');
+  };
+  const hideSettings = () => {
+    if (settingsDrawer) settingsDrawer.classList.remove('active');
+  };
+
   // Search input (may not exist in new UI)
   if (searchInput) {
   searchInput.addEventListener('input', e => {
@@ -685,10 +675,341 @@ function setupEventListeners() {
   const manualToggleBtn = getElement('manual-token-toggle');
   const tokenInputGroup = getElement('token-input-group');
   const oauthStatus = getElement('oauth-status');
+  const clipToGleanBtn = getElement('clip-to-glean-btn');
+  const menuSaveCollection = getElement('menu-save-collection');
+  const menuSaveUrl = getElement('menu-save-url');
+  const menuRecentClips = getElement('menu-recent-clips');
+  const menuLibrary = getElement('menu-library');
+  const menuCaptureArea = getElement('menu-capture-area');
+  const menuCaptureVisible = getElement('menu-capture-visible');
+  const menuCapturePage = getElement('menu-capture-page');
+  const menuPreferences = getElement('menu-preferences');
+  const menuConfiguration = getElement('menu-configuration');
 
-  if (settingsBtn) {
-    settingsBtn.addEventListener('click', toggleSettings);
+  // Clip to Glean button - clips currently selected text
+  if (clipToGleanBtn) {
+    clipToGleanBtn.addEventListener('click', async () => {
+      try {
+        // Get the active tab
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab.id) return;
+
+        // Inject content script to get selected text
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => window.getSelection()?.toString() || '',
+        });
+
+        const selectedText = results[0]?.result || '';
+        if (!selectedText.trim()) {
+          alert('Please select some text on the page first, then click "Clip to Glean"');
+          return;
+        }
+
+        // Send message to background to clip
+        await safeRuntimeSendMessage({
+          action: 'saveClip',
+          data: {
+            url: tab.url || '',
+            title: tab.title || '',
+            selectedText: selectedText,
+            domain: tab.url ? new URL(tab.url).hostname : '',
+            timestamp: Date.now(),
+          },
+        });
+
+        alert('✅ Clipped to Glean!');
+      } catch (error) {
+        console.error('Failed to clip:', error);
+        alert('Failed to clip. Make sure you have text selected on the page.');
+      }
+    });
   }
+
+  // New menu bindings
+  if (menuSaveCollection) {
+    menuSaveCollection.addEventListener('click', () => {
+      if (clipToGleanBtn) {
+        clipToGleanBtn.click();
+      }
+    });
+  }
+
+  if (menuSaveUrl) {
+    menuSaveUrl.addEventListener('click', async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) return;
+        await safeRuntimeSendMessage({
+          action: 'saveClip',
+          data: {
+            url: tab.url || '',
+            title: tab.title || '',
+            selectedText: '',
+            domain: tab.url ? new URL(tab.url).hostname : '',
+            timestamp: Date.now(),
+          },
+        });
+        alert('✅ URL saved to Glean!');
+      } catch (error) {
+        console.error('Failed to save URL:', error);
+        alert('Failed to save URL.');
+      }
+    });
+  }
+
+  const recentClipsUrl = chrome.runtime?.getURL ? chrome.runtime.getURL('reader.html') : 'reader.html';
+  const libraryUrl = chrome.runtime?.getURL ? chrome.runtime.getURL('library.html') : 'library.html';
+
+  if (menuRecentClips) {
+    menuRecentClips.addEventListener('click', () => {
+      if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+        chrome.tabs.create({ url: recentClipsUrl });
+      } else {
+        window.open(recentClipsUrl, '_blank');
+      }
+    });
+  }
+
+  const menuPrompts = getElement('menu-prompts');
+  if (menuPrompts) {
+    menuPrompts.addEventListener('click', () => {
+      const promptsUrl = chrome.runtime?.getURL ? chrome.runtime.getURL('prompts.html') : 'prompts.html';
+      if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+        chrome.tabs.create({ url: promptsUrl });
+      } else {
+        window.open(promptsUrl, '_blank');
+      }
+    });
+  }
+
+  if (menuLibrary) {
+    menuLibrary.addEventListener('click', () => {
+      if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+        chrome.tabs.create({ url: libraryUrl });
+      } else {
+        window.open(libraryUrl, '_blank');
+      }
+    });
+  }
+
+  const comingSoon = () => alert('Capture actions will be available soon.');
+  if (menuCaptureArea) menuCaptureArea.addEventListener('click', comingSoon);
+  if (menuCaptureVisible) menuCaptureVisible.addEventListener('click', comingSoon);
+  if (menuCapturePage) menuCapturePage.addEventListener('click', comingSoon);
+
+  const openSettings = () => {
+    showSettings();
+  };
+  const configCollectionsList = document.getElementById('config-collections-list');
+
+  async function loadCollectionsForConfig() {
+    if (!configCollectionsList) return;
+    configCollectionsList.textContent = 'Loading collections...';
+    let collections = [];
+    try {
+      const res = await safeRuntimeSendMessage({ action: 'fetchCollections' });
+      if (res?.success && Array.isArray(res.collections)) {
+        collections = res.collections;
+      }
+    } catch (e) {}
+    let currentId = '';
+    try {
+      if (chrome?.storage?.local) {
+        const result = await chrome.storage.local.get(['gleanConfig']);
+        currentId = result?.gleanConfig?.collectionId || '';
+      }
+    } catch (e) {}
+    if (!collections.length) {
+      configCollectionsList.textContent = 'No collections found.';
+      return;
+    }
+    configCollectionsList.innerHTML = collections
+      .map(
+        (c) => `
+        <label class="config-collection-item">
+          <input type="radio" name="config-collection" value="${c.id}" ${String(c.id) === String(currentId) ? 'checked' : ''}/>
+          <span>${escapeHtml(c.name || 'Untitled')}</span>
+        </label>
+      `
+      )
+      .join('');
+    configCollectionsList.querySelectorAll('input[type="radio"]').forEach((input) => {
+      input.addEventListener('change', async () => {
+        const val = input.value;
+        try {
+          if (chrome?.storage?.local) {
+            const res = await chrome.storage.local.get(['gleanConfig']);
+            const cfg = res.gleanConfig || {};
+            cfg.collectionId = val;
+            await chrome.storage.local.set({ gleanConfig: cfg });
+          }
+        } catch (e) {}
+      });
+    });
+  }
+
+  const openConfigWindow = () => {
+    const configWindow = document.getElementById('config-window');
+    if (configWindow) configWindow.classList.add('active');
+    loadCollectionsForConfig();
+  };
+  const closeConfigWindow = () => {
+    const configWindow = document.getElementById('config-window');
+    if (configWindow) configWindow.classList.remove('active');
+  };
+
+  // Swap to correct navigation: Preferences -> config window (white), Configuration -> legacy settings
+  if (menuPreferences) menuPreferences.addEventListener('click', openConfigWindow);
+  if (menuConfiguration) menuConfiguration.addEventListener('click', openSettings);
+  if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
+  if (settingsClose) settingsClose.addEventListener('click', hideSettings);
+
+  // Slack Integration
+  const menuSlack = getElement('menu-slack');
+  const slackModal = document.getElementById('slack-modal');
+  const slackModalOverlay = document.getElementById('slack-modal-overlay');
+  const slackModalClose = document.getElementById('slack-modal-close');
+  const slackForm = document.getElementById('slack-form');
+  const slackConnectionStatus = document.getElementById('slack-connection-status');
+  const slackChannel = document.getElementById('slack-channel');
+  const slackMessage = document.getElementById('slack-message');
+  const slackShareBtn = document.getElementById('slack-share-btn');
+
+  async function checkSlackStatus() {
+    try {
+      const result = await safeRuntimeSendMessage({ action: 'checkSlackConnection' });
+      if (result?.connected) {
+        slackConnectionStatus.innerHTML = `
+          <div class="slack-status-connected">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <path d="M22 4L12 14.01l-3-3" />
+            </svg>
+            Connected to Slack${result.teamName ? ` (${result.teamName})` : ''}
+          </div>
+        `;
+        slackForm.style.display = 'block';
+        loadSlackChannels();
+      } else {
+        slackConnectionStatus.innerHTML = `
+          <div class="slack-status-disconnected">
+            <span>Not connected to Slack</span>
+            <button class="slack-connect-btn" onclick="connectSlack()">Connect</button>
+          </div>
+        `;
+        slackForm.style.display = 'none';
+      }
+    } catch (e) {
+      slackConnectionStatus.innerHTML = `
+        <div class="slack-status-disconnected">
+          <span>Error checking connection</span>
+          <button class="slack-connect-btn" onclick="connectSlack()">Connect</button>
+        </div>
+      `;
+    }
+  }
+
+  async function loadSlackChannels() {
+    try {
+      const result = await safeRuntimeSendMessage({ action: 'getSlackChannels' });
+      if (result?.success && result.channels) {
+        slackChannel.innerHTML = '<option value="">Choose a channel...</option>' +
+          result.channels.map(c => `<option value="${c.id}">#${escapeHtml(c.name)}</option>`).join('');
+      }
+    } catch (e) {
+      console.error('Error loading channels:', e);
+    }
+  }
+
+  window.connectSlack = async function() {
+    try {
+      const result = await safeRuntimeSendMessage({ action: 'initiateSlackOAuth' });
+      if (result?.success) {
+        // OAuth flow will open in new tab
+        // In production, handle callback and update status
+        setTimeout(checkSlackStatus, 2000);
+      }
+    } catch (e) {
+      alert('Failed to connect to Slack: ' + e.message);
+    }
+  };
+
+  if (menuSlack) {
+    menuSlack.addEventListener('click', () => {
+      if (slackModal) {
+        slackModal.style.display = 'flex';
+        checkSlackStatus();
+      }
+    });
+  }
+
+  if (slackModalOverlay) {
+    slackModalOverlay.addEventListener('click', () => {
+      if (slackModal) slackModal.style.display = 'none';
+    });
+  }
+
+  if (slackModalClose) {
+    slackModalClose.addEventListener('click', () => {
+      if (slackModal) slackModal.style.display = 'none';
+    });
+  }
+
+  if (slackShareBtn) {
+    slackShareBtn.addEventListener('click', async () => {
+      const channelId = slackChannel.value;
+      const message = slackMessage.value.trim();
+      
+      if (!channelId) {
+        alert('Please select a channel');
+        return;
+      }
+
+      slackShareBtn.disabled = true;
+      slackShareBtn.innerHTML = '<span class="spinner"></span> Sharing...';
+
+      try {
+        // Get current tab info for clip
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const clip = {
+          title: tab.title || '',
+          url: tab.url || '',
+          selectedText: '',
+          description: message || tab.title || '',
+        };
+
+        const result = await safeRuntimeSendMessage({
+          action: 'postToSlack',
+          channelId,
+          text: message,
+          clip,
+        });
+
+        if (result?.success) {
+          alert('✅ Shared to Slack!');
+          slackModal.style.display = 'none';
+          slackMessage.value = '';
+          slackChannel.value = '';
+        } else {
+          alert('Failed to share: ' + (result?.error || 'Unknown error'));
+        }
+      } catch (e) {
+        alert('Error sharing to Slack: ' + e.message);
+      } finally {
+        slackShareBtn.disabled = false;
+        slackShareBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+          </svg>
+          Share to Channel
+        `;
+      }
+    });
+  }
+  const configBack = document.getElementById('config-back');
+  if (configBack) configBack.addEventListener('click', closeConfigWindow);
+
   if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', saveSettings);
   }
@@ -706,6 +1027,29 @@ function setupEventListeners() {
   }
   if (manualToggleBtn) {
     manualToggleBtn.addEventListener('click', toggleManualToken);
+  }
+
+  // Config window actions
+  const configTokenPage = document.getElementById('config-token-page');
+  const configTokenInput = document.getElementById('config-token-input');
+  const configSave = document.getElementById('config-save');
+  const configTest = document.getElementById('config-test');
+  if (configTokenPage) {
+    configTokenPage.addEventListener('click', () => {
+      handleOAuthLogin();
+    });
+  }
+  if (configSave) {
+    configSave.addEventListener('click', () => {
+      const tokenInput = getElement('glean-client-token');
+      if (configTokenInput && tokenInput) {
+        tokenInput.value = configTokenInput.value;
+      }
+      saveSettings();
+    });
+  }
+  if (configTest) {
+    configTest.addEventListener('click', testConnection);
   }
 
   // Collection search input
@@ -746,7 +1090,7 @@ function setupEventListeners() {
         const config = result.gleanConfig || {};
         config.collectionId = '';
         await chrome.storage.local.set({ gleanConfig: config });
-        console.log('✅ Collection cleared');
+        // Collection cleared
       } catch (error) {
         console.error('Failed to clear collection:', error);
       }
@@ -819,10 +1163,7 @@ function setupEventListeners() {
         
         console.log('📋 Total clips before clear:', clips.length);
         
-        // Debug: Log first clip's full structure to see what properties exist
-        if (clips.length > 0) {
-          console.log('🔍 First clip full object:', JSON.stringify(clips[0], null, 2));
-        }
+        // Processing clips to remove synced ones
         
         // Remove all clips that are synced (from extension view only)
         // If a clip has a collectionId, it was successfully synced to Glean
@@ -836,27 +1177,13 @@ function setupEventListeners() {
           // Remove if it has collectionId (primary indicator) OR is explicitly marked as synced
           const shouldRemove = hasCollectionId || isSynced;
           
-          if (shouldRemove) {
-            console.log(`🗑️ Removing synced clip: "${clip.title?.substring(0, 40)}"`, {
-              collectionId: collectionId,
-              syncStatus: clip.syncStatus,
-              synced: clip.synced,
-              hasCollectionId: hasCollectionId,
-              isSynced: isSynced
-            });
-          } else {
-            console.log(`✅ Keeping clip: "${clip.title?.substring(0, 40)}"`, {
-              collectionId: collectionId,
-              syncStatus: clip.syncStatus,
-              synced: clip.synced
-            });
-          }
+          // Filter logic: remove synced clips
           
           return !shouldRemove; // Keep only non-synced clips
         });
         
         const syncedCount = clips.length - updatedClips.length;
-        console.log(`✅ Removed ${syncedCount} synced clips from extension view (kept ${updatedClips.length} non-synced)`);
+        console.debug(`Removed ${syncedCount} synced clips from extension view (kept ${updatedClips.length} non-synced)`);
 
         await chrome.storage.local.set({ clips: updatedClips });
         await loadClips();
@@ -1601,37 +1928,80 @@ async function handleOAuthLogin() {
   }
 
   try {
-    // Get domain from config
+    // Import OAuth module
+    const { initiateOAuthFlow } = await import('./modules/oauth.js');
+    
+    // Get current config
     const result = await chrome.storage.local.get(['gleanConfig']);
-    const domain = result.gleanConfig?.domain || 'app.glean.com';
+    const config = result.gleanConfig || { domain: 'app.glean.com' };
     
-    // Clean domain (remove protocol and -be suffix if present)
-    let cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    if (cleanDomain.includes('-be.')) {
-      cleanDomain = cleanDomain.replace('-be.', '.');
+    // Show loading state
+    const oauthBtn = getElement('oauth-authenticate-btn');
+    const oauthStatus = getElement('oauth-status');
+    if (oauthBtn) {
+      oauthBtn.disabled = true;
+      oauthBtn.textContent = 'Authenticating...';
     }
     
-    // Open Glean's token management page
-    const tokenPageUrl = `https://${cleanDomain}/admin/platform/tokenManagement?tab=client`;
+    // Initiate OAuth flow
+    const token = await initiateOAuthFlow(config);
     
-    chrome.tabs.create({ url: tokenPageUrl });
-    
-    // Show manual token input and instructions
-    const tokenInputGroup = getElement('token-input-group');
-    const tokenInput = getElement('glean-client-token');
-    
-    if (tokenInputGroup) {
-      tokenInputGroup.style.display = 'block';
+    // Success - update UI
+    if (oauthBtn) {
+      oauthBtn.disabled = false;
+      oauthBtn.textContent = '🔐 Authenticate with OAuth';
     }
-    if (tokenInput) {
-      tokenInput.focus();
+    if (oauthStatus) {
+      oauthStatus.style.display = 'block';
+      oauthStatus.textContent = '✅ Authenticated via OAuth';
     }
     
-    // Show helpful message
-    alert(`📋 Opened Glean token management page!\n\nSteps:\n1. Create a new Client API token\n2. Copy the token\n3. Paste it in the field below\n4. Click "Save Settings"`);
+    // Reload settings to reflect new auth state
+    await loadSettings();
+    
+    // Show success message
+    alert('✅ OAuth authentication successful! Your token has been saved.');
   } catch (error) {
-    console.error('Failed to open OAuth page:', error);
-    alert('Failed to open token page. Please navigate manually to: Glean Admin → API Tokens → Client API tokens');
+    console.error('OAuth authentication failed:', error);
+    
+    // Reset button state
+    const oauthBtn = getElement('oauth-authenticate-btn');
+    if (oauthBtn) {
+      oauthBtn.disabled = false;
+      oauthBtn.textContent = '🔐 Authenticate with OAuth';
+    }
+    
+    // If OAuth is not configured, fall back to manual token entry
+    if (error.message.includes('OAuth not configured') || error.message.includes('client_id')) {
+      // Get domain from config
+      const result = await chrome.storage.local.get(['gleanConfig']);
+      const domain = result.gleanConfig?.domain || 'app.glean.com';
+      
+      // Clean domain (remove protocol and -be suffix if present)
+      let cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      if (cleanDomain.includes('-be.')) {
+        cleanDomain = cleanDomain.replace('-be.', '.');
+      }
+      
+      // Open Glean's token management page as fallback
+      const tokenPageUrl = `https://${cleanDomain}/admin/platform/tokenManagement?tab=client`;
+      chrome.tabs.create({ url: tokenPageUrl });
+      
+      // Show manual token input and instructions
+      const tokenInputGroup = getElement('token-input-group');
+      const tokenInput = getElement('glean-client-token');
+      
+      if (tokenInputGroup) {
+        tokenInputGroup.style.display = 'block';
+      }
+      if (tokenInput) {
+        tokenInput.focus();
+      }
+      
+      alert(`OAuth not configured. Opened token management page as fallback.\n\nSteps:\n1. Create a new Client API token\n2. Copy the token\n3. Paste it in the field below\n4. Click "Save Settings"`);
+    } else {
+      alert(`OAuth authentication failed: ${error.message}`);
+    }
   }
 }
 

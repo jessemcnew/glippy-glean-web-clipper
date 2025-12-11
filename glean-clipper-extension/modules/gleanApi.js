@@ -91,18 +91,29 @@ async function syncToGleanCollections(clip, config) {
   });
   const description = `${clip.title}\n\n${cleanText}\n\nClipped: ${clippedDate}`;
   
+  // Build item descriptor matching Glean API format
+  // Reference: collections_manager.py add_items_to_collection
+  const itemDescriptor = {
+    url: clip.url,
+    name: clip.title || 'Untitled Clip',
+    description: description,
+    // Optional fields that improve item display
+    itemType: 'DOCUMENT', // Standard type for web clips
+  };
+  
+  // Add documentId if available (from previous sync or indexing)
+  if (clip.documentId) {
+    itemDescriptor.documentId = clip.documentId;
+  }
+  
   const payload = {
     collectionId: parseInt(config.collectionId),
-    addedCollectionItemDescriptors: [
-      {
-        url: clip.url,
-        description: description,
-      },
-    ],
+    addedCollectionItemDescriptors: [itemDescriptor],
   };
 
-  // Create headers with OAuth auth type (required per docs)
-  const headers = createCollectionsAPIHeaders(config.apiToken);
+  // Create headers - use OAuth header if token is from OAuth flow
+  const isOAuthToken = config.authMethod === 'oauth';
+  const headers = createCollectionsAPIHeaders(config.apiToken, {}, isOAuthToken);
 
   console.log('SENDING: Collections API Request');
   console.log('URL:', collectionsUrl);
@@ -304,7 +315,8 @@ async function fetchGleanCollections() {
 
     // Use apiToken or clientToken
     const token = config.apiToken || config.clientToken;
-    const headers = createCollectionsAPIHeaders(token);
+    const isOAuthToken = config.authMethod === 'oauth';
+    const headers = createCollectionsAPIHeaders(token, {}, isOAuthToken);
 
     console.log('📡 Calling listCollections API:', listUrl);
 
@@ -436,8 +448,9 @@ async function testGleanConnection() {
       hasToken: !!token,
     });
 
-    // Create headers with OAuth auth type
-    const headers = createCollectionsAPIHeaders(token);
+    // Create headers - use OAuth header if token is from OAuth flow
+    const isOAuthToken = config.authMethod === 'oauth';
+    const headers = createCollectionsAPIHeaders(token, {}, isOAuthToken);
     console.log('📋 Request Headers:', {
       'Content-Type': headers['Content-Type'],
       'Accept': headers['Accept'],
@@ -519,6 +532,312 @@ async function testGleanConnection() {
   }
 }
 
+/**
+ * Fetches items from a specific Glean collection
+ * Uses the getcollection endpoint and attempts to extract items
+ * @param {string} collectionId - The collection ID
+ * @param {Object} config - Glean configuration
+ * @returns {Promise<Object>} Collection items result
+ */
+async function fetchCollectionItems(collectionId, config) {
+  if (!collectionId) {
+    return { success: false, items: [], error: 'Collection ID is required' };
+  }
+
+  try {
+    const baseUrl = normalizeDomain(config.domain);
+    const getCollectionUrl = `${baseUrl}/rest/api/v1/getcollection`;
+    
+    const token = config.apiToken || config.clientToken;
+    const isOAuthToken = config.authMethod === 'oauth';
+    const headers = createCollectionsAPIHeaders(token, {}, isOAuthToken);
+
+    const payload = {
+      collectionId: parseInt(collectionId),
+    };
+
+    const result = await fetchJSON(getCollectionUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      mode: 'cors',
+      credentials: 'omit',
+    });
+
+    // Extract items from collection response
+    // Note: API may return items in different formats
+    // The getcollection endpoint may not return items directly
+    // We'll try to extract from various possible response structures
+    let items = [];
+    
+    if (result.items && Array.isArray(result.items)) {
+      items = result.items;
+    } else if (result.collectionItems && Array.isArray(result.collectionItems)) {
+      items = result.collectionItems;
+    } else if (result.data?.items && Array.isArray(result.data.items)) {
+      items = result.data.items;
+    } else if (result.collection?.items && Array.isArray(result.collection.items)) {
+      items = result.collection.items;
+    }
+    
+    // If no items found, return empty array (API may not support listing items)
+    return {
+      success: true,
+      items: items.map(item => ({
+        id: item.id || item.itemId || item.documentId || `item-${Date.now()}-${Math.random()}`,
+        title: item.name || item.title || item.itemName || 'Untitled',
+        url: item.url || item.viewURL || item.itemURL || '',
+        description: item.description || item.itemDescription || '',
+        addedAt: item.addedAt || item.createdAt || item.dateAdded || new Date().toISOString(),
+        collectionId: collectionId,
+      })),
+      collectionName: result.name || result.collectionName || result.collection?.name,
+    };
+  } catch (error) {
+    console.error('Error fetching collection items:', error);
+    return {
+      success: false,
+      items: [],
+      error: error.message || 'Failed to fetch collection items',
+    };
+  }
+}
+
+/**
+ * Fetches all clips from Glean by searching across collections
+ * This is a hybrid approach: combines local storage with API data
+ * @param {Object} options - Fetch options
+ * @param {string} options.collectionId - Optional collection ID to filter by
+ * @returns {Promise<Object>} Clips result
+ */
+async function fetchClipsFromGlean(options = {}) {
+  try {
+    const config = await getGleanConfig();
+    
+    if (!config.enabled || (!config.apiToken && !config.clientToken)) {
+      // Fallback to local storage if API not configured
+      const storageModule = await import('./storage.js');
+      const localClips = await storageModule.getClips();
+      return {
+        success: true,
+        clips: localClips,
+        source: 'local',
+      };
+    }
+
+    const { collectionId } = options;
+    
+    // If specific collection requested, fetch from that collection
+    if (collectionId) {
+      const result = await fetchCollectionItems(collectionId, config);
+      return {
+        success: result.success,
+        clips: result.items || [],
+        collectionName: result.collectionName,
+        source: 'api',
+      };
+    }
+
+    // Otherwise, fetch from all collections user has access to
+    const collectionsResult = await fetchGleanCollections();
+    if (!collectionsResult.success || !collectionsResult.collections?.length) {
+      // Fallback to local storage
+      const storageModule = await import('./storage.js');
+      const localClips = await storageModule.getClips();
+      return {
+        success: true,
+        clips: localClips,
+        source: 'local',
+      };
+    }
+
+    // Fetch items from all collections (limit to first 10 to avoid timeout)
+    const allClips = [];
+    const collectionsToFetch = collectionsResult.collections.slice(0, 10);
+    for (const collection of collectionsToFetch) {
+      try {
+        const itemsResult = await fetchCollectionItems(collection.id, config);
+        if (itemsResult.success && itemsResult.items) {
+          allClips.push(...itemsResult.items);
+        }
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.warn(`Failed to fetch items from collection ${collection.id}:`, error);
+      }
+    }
+
+    // Also merge with local clips for completeness
+    const storageModule = await import('./storage.js');
+    const localClips = await storageModule.getClips();
+    
+    // Merge and deduplicate by URL
+    const clipMap = new Map();
+    [...localClips, ...allClips].forEach(clip => {
+      const key = clip.url || clip.id;
+      if (!clipMap.has(key) || !clipMap.get(key).synced) {
+        clipMap.set(key, { ...clip, synced: !!clip.collectionId });
+      }
+    });
+
+    return {
+      success: true,
+      clips: Array.from(clipMap.values()),
+      source: 'hybrid',
+    };
+  } catch (error) {
+    console.error('Error fetching clips from Glean:', error);
+    // Fallback to local storage
+    try {
+      const storageModule = await import('./storage.js');
+      const localClips = await storageModule.getClips();
+      return {
+        success: true,
+        clips: localClips,
+        source: 'local',
+        error: error.message,
+      };
+    } catch (storageError) {
+      console.error('Error loading from local storage:', storageError);
+      return {
+        success: false,
+        clips: [],
+        source: 'error',
+        error: error.message,
+      };
+    }
+  }
+}
+
+/**
+ * Searches for Glean agents by name
+ * @param {string} query - Search query for agent name
+ * @param {Object} config - Glean configuration
+ * @returns {Promise<Object>} Agents search result
+ */
+async function searchGleanAgents(query, config) {
+  try {
+    const baseUrl = normalizeDomain(config.domain);
+    const searchUrl = `${baseUrl}/rest/api/v1/agents/search`;
+    
+    const token = config.apiToken || config.clientToken;
+    const isOAuthToken = config.authMethod === 'oauth';
+    const headers = createCollectionsAPIHeaders(token, {}, isOAuthToken);
+
+    const payload = {
+      query: query || '',
+    };
+
+    const result = await fetchJSON(searchUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      mode: 'cors',
+      credentials: 'omit',
+    });
+
+    return {
+      success: true,
+      agents: result.agents || result.data?.agents || [],
+    };
+  } catch (error) {
+    console.error('Error searching agents:', error);
+    return {
+      success: false,
+      agents: [],
+      error: error.message || 'Failed to search agents',
+    };
+  }
+}
+
+/**
+ * Runs a Glean agent to find similar articles
+ * @param {string} agentId - The agent ID to run
+ * @param {Object} input - Agent input parameters (e.g., article title, content)
+ * @param {Object} config - Glean configuration
+ * @returns {Promise<Object>} Agent run result
+ */
+async function runGleanAgent(agentId, input, config) {
+  try {
+    const baseUrl = normalizeDomain(config.domain);
+    const runUrl = `${baseUrl}/rest/api/v1/agents/runs/wait`;
+    
+    const token = config.apiToken || config.clientToken;
+    const isOAuthToken = config.authMethod === 'oauth';
+    const headers = createCollectionsAPIHeaders(token, {}, isOAuthToken);
+
+    const payload = {
+      agentId: agentId,
+      input: input,
+    };
+
+    const result = await fetchJSON(runUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      mode: 'cors',
+      credentials: 'omit',
+    });
+
+    return {
+      success: true,
+      output: result.output || result.data || result,
+      articles: result.articles || result.output?.articles || [],
+    };
+  } catch (error) {
+    console.error('Error running agent:', error);
+    return {
+      success: false,
+      articles: [],
+      error: error.message || 'Failed to run agent',
+    };
+  }
+}
+
+/**
+ * Finds similar articles using a Glean agent
+ * Creates or uses an agent to find articles similar to the given article
+ * @param {Object} article - Article to find similar ones for
+ * @param {Object} config - Glean configuration
+ * @returns {Promise<Object>} Similar articles result
+ */
+async function findSimilarArticles(article, config) {
+  try {
+    // First, search for a "similar articles" agent
+    const agentsResult = await searchGleanAgents('similar articles', config);
+    
+    let agentId = null;
+    if (agentsResult.success && agentsResult.agents.length > 0) {
+      // Use first matching agent
+      agentId = agentsResult.agents[0].id;
+    } else {
+      // If no agent found, we could create one or use a default
+      // For now, return error suggesting to create agent in Glean UI
+      return {
+        success: false,
+        articles: [],
+        error: 'No "similar articles" agent found. Please create one in Glean Agent Builder.',
+      };
+    }
+
+    // Run the agent with article context
+    const input = {
+      title: article.title || '',
+      content: article.excerpt || article.description || '',
+      url: article.url || '',
+    };
+
+    return await runGleanAgent(agentId, input, config);
+  } catch (error) {
+    console.error('Error finding similar articles:', error);
+    return {
+      success: false,
+      articles: [],
+      error: error.message || 'Failed to find similar articles',
+    };
+  }
+}
+
  // Export functions for use in other modules
 export {
   syncToGleanCollectionsWithRetry,
@@ -527,4 +846,9 @@ export {
   testGleanIndexing,
   fetchGleanCollections,
   testGleanConnection,
+  fetchCollectionItems,
+  fetchClipsFromGlean,
+  searchGleanAgents,
+  runGleanAgent,
+  findSimilarArticles,
 };

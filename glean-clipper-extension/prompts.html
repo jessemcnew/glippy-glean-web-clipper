@@ -1,0 +1,224 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Saved Prompts</title>
+    <link rel="stylesheet" href="prompts.css" />
+  </head>
+  <body>
+    <div class="prompts-shell">
+      <header class="prompts-header">
+        <div>
+          <h1>Saved Prompts</h1>
+          <p id="prompt-count">0 prompts</p>
+        </div>
+        <button id="back-btn" class="back-btn" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+        </button>
+      </header>
+
+      <main class="prompts-main">
+        <!-- Save New Prompt Section -->
+        <div class="prompts-card">
+          <h2>Save New Prompt</h2>
+          <div class="prompts-form">
+            <input type="text" id="prompt-title" class="prompts-input" placeholder="Prompt title..." />
+            <textarea id="prompt-content" class="prompts-textarea" placeholder="Enter your prompt..." rows="4"></textarea>
+            <button id="save-prompt-btn" class="prompts-primary-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <path d="M17 21v-8H7v8M7 3v5h8" />
+              </svg>
+              Save Prompt
+            </button>
+          </div>
+        </div>
+
+        <!-- Saved Prompts List -->
+        <div id="prompts-list" class="prompts-list"></div>
+      </main>
+    </div>
+
+    <script type="module">
+      const titleInput = document.getElementById('prompt-title');
+      const contentInput = document.getElementById('prompt-content');
+      const saveBtn = document.getElementById('save-prompt-btn');
+      const promptsList = document.getElementById('prompts-list');
+      const promptCount = document.getElementById('prompt-count');
+      const backBtn = document.getElementById('back-btn');
+      let prompts = [];
+      let editingId = null;
+
+      function escapeHtml(str = '') {
+        return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+      }
+
+      async function loadPrompts() {
+        try {
+          if (chrome?.storage?.local) {
+            const res = await chrome.storage.local.get(['savedPrompts']);
+            prompts = res.savedPrompts || [];
+          } else {
+            prompts = [];
+          }
+        } catch (e) {
+          prompts = [];
+        }
+        render();
+      }
+
+      async function savePrompts() {
+        try {
+          if (chrome?.storage?.local) {
+            await chrome.storage.local.set({ savedPrompts: prompts });
+          }
+        } catch (e) {
+          console.error('Error saving prompts:', e);
+        }
+      }
+
+      function render() {
+        promptCount.textContent = `${prompts.length} prompt${prompts.length === 1 ? '' : 's'}`;
+        
+        if (prompts.length === 0) {
+          promptsList.innerHTML = '<div class="prompts-empty">No prompts saved yet</div>';
+          return;
+        }
+
+        promptsList.innerHTML = prompts.map(p => {
+          if (editingId === p.id) {
+            return `
+              <div class="prompts-card" data-id="${p.id}">
+                <input type="text" class="prompts-input" value="${escapeHtml(p.title)}" id="edit-title-${p.id}" />
+                <textarea class="prompts-textarea" rows="4" id="edit-content-${p.id}">${escapeHtml(p.content)}</textarea>
+                <div class="prompts-actions">
+                  <button class="prompts-secondary-btn" onclick="saveEdit('${p.id}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                      <path d="M17 21v-8H7v8M7 3v5h8" />
+                    </svg>
+                    Save
+                  </button>
+                  <button class="prompts-ghost-btn" onclick="cancelEdit()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            `;
+          }
+          return `
+            <div class="prompts-card" data-id="${p.id}">
+              <div class="prompts-card-header">
+                <div>
+                  <h3>${escapeHtml(p.title)}</h3>
+                  <p class="prompts-date">${new Date(p.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div class="prompts-card-actions">
+                  <button class="prompts-icon-btn" onclick="startEdit('${p.id}')" aria-label="Edit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </button>
+                  <button class="prompts-icon-btn prompts-delete" onclick="deletePrompt('${p.id}')" aria-label="Delete">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <p class="prompts-content">${escapeHtml(p.content)}</p>
+            </div>
+          `;
+        }).join('');
+
+        // Re-attach event listeners for edit inputs
+        prompts.forEach(p => {
+          if (editingId === p.id) {
+            const titleEl = document.getElementById(`edit-title-${p.id}`);
+            const contentEl = document.getElementById(`edit-content-${p.id}`);
+            if (titleEl) titleEl.addEventListener('input', (e) => {
+              p.title = e.target.value;
+            });
+            if (contentEl) contentEl.addEventListener('input', (e) => {
+              p.content = e.target.value;
+            });
+          }
+        });
+      }
+
+      window.startEdit = (id) => {
+        editingId = id;
+        render();
+      };
+
+      window.saveEdit = async (id) => {
+        const titleEl = document.getElementById(`edit-title-${id}`);
+        const contentEl = document.getElementById(`edit-content-${id}`);
+        if (!titleEl || !contentEl) return;
+        
+        const title = titleEl.value.trim();
+        const content = contentEl.value.trim();
+        if (!title || !content) return;
+
+        const prompt = prompts.find(p => p.id === id);
+        if (prompt) {
+          prompt.title = title;
+          prompt.content = content;
+          await savePrompts();
+        }
+        editingId = null;
+        render();
+      };
+
+      window.cancelEdit = () => {
+        editingId = null;
+        render();
+      };
+
+      window.deletePrompt = async (id) => {
+        if (confirm('Delete this prompt?')) {
+          prompts = prompts.filter(p => p.id !== id);
+          if (editingId === id) editingId = null;
+          await savePrompts();
+          render();
+        }
+      };
+
+      saveBtn.addEventListener('click', async () => {
+        const title = titleInput.value.trim();
+        const content = contentInput.value.trim();
+        if (!title || !content) return;
+
+        const newPrompt = {
+          id: Date.now().toString(),
+          title,
+          content,
+          createdAt: Date.now(),
+        };
+
+        prompts = [newPrompt, ...prompts];
+        await savePrompts();
+        titleInput.value = '';
+        contentInput.value = '';
+        render();
+      });
+
+      backBtn.addEventListener('click', () => {
+        if (chrome?.tabs?.create) {
+          chrome.tabs.create({ url: chrome.runtime.getURL('popup-modern.html') });
+        } else {
+          window.location.href = 'popup-modern.html';
+        }
+      });
+
+      loadPrompts();
+    </script>
+  </body>
+</html>
+

@@ -4,7 +4,7 @@
 // Import modules
 import { initializeServiceWorker } from './modules/serviceWorker.js';
 import { initializeUI } from './modules/uiHelpers.js';
-import { saveClip, retryClipSync, getGleanConfig } from './modules/storage.js';
+import { saveClip, retryClipSync, getGleanConfig, getClips, deleteClip as deleteClipFromStorage } from './modules/storage.js';
 import {
   syncToGleanCollectionsWithRetry,
   syncToGleanIndexingAPI,
@@ -12,7 +12,19 @@ import {
   testGleanIndexing,
   fetchGleanCollections,
   testGleanConnection,
+  fetchCollectionItems,
+  fetchClipsFromGlean,
+  searchGleanAgents,
+  runGleanAgent,
+  findSimilarArticles,
 } from './modules/gleanApi.js';
+import {
+  initiateSlackOAuth,
+  exchangeSlackToken,
+  getSlackChannels,
+  postToSlack,
+  checkSlackConnection,
+} from './modules/slackApi.js';
 
 // Initialize all modules
 console.log('Initializing Glean Web Clipper background service worker...');
@@ -107,6 +119,52 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true;
 
+    case 'getClips':
+      getClips()
+        .then(clips => sendResponse({ success: true, clips }))
+        .catch(error => sendResponse({ success: false, error: error.message, clips: [] }));
+      return true;
+
+    case 'deleteClip':
+      deleteClipFromStorage(request.clipId)
+        .then(success => sendResponse({ success }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'getOAuthToken':
+      // Share OAuth token with dashboard/web pages
+      (async () => {
+        try {
+          const { getOrRefreshOAuthToken } = await import('./modules/oauth.js');
+          const config = await getGleanConfig();
+          if (config?.authMethod === 'oauth' && config?.apiToken) {
+            // Return existing OAuth token
+            sendResponse({ 
+              success: true, 
+              token: config.apiToken,
+              domain: config.domain,
+              authMethod: 'oauth'
+            });
+          } else {
+            // Try to get OAuth token (will prompt user if needed)
+            const token = await getOrRefreshOAuthToken(config || { domain: 'app.glean.com' });
+            sendResponse({ 
+              success: true, 
+              token,
+              domain: config?.domain || 'app.glean.com',
+              authMethod: 'oauth'
+            });
+          }
+        } catch (error) {
+          sendResponse({ 
+            success: false, 
+            error: error.message,
+            requiresSetup: error.message.includes('not configured')
+          });
+        }
+      })();
+      return true; // Keep channel open for async
+
     case 'refreshCollections':
       // Collections API doesn't support listing, so return empty result
       sendResponse({ success: true, collections: [], collectionsCount: 0 });
@@ -116,6 +174,76 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       handleAddToCollection(request.collectionId, request.clip)
         .then(() => sendResponse({ success: true }))
         .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'openNotebook':
+      // Open reader.html in a new tab (notebook/reader view)
+      try {
+        const readerUrl = chrome.runtime.getURL('reader.html');
+        chrome.tabs.create({ url: readerUrl });
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error('Failed to open notebook:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+      return false; // Synchronous response
+
+    case 'fetchCollectionItems':
+      fetchCollectionItems(request.collectionId, await getGleanConfig())
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, items: [], error: error.message }));
+      return true;
+
+    case 'fetchClipsFromGlean':
+      fetchClipsFromGlean(request.options || {})
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, clips: [], error: error.message }));
+      return true;
+
+    case 'searchGleanAgents':
+      searchGleanAgents(request.query || '', await getGleanConfig())
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, agents: [], error: error.message }));
+      return true;
+
+    case 'runGleanAgent':
+      runGleanAgent(request.agentId, request.input || {}, await getGleanConfig())
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, articles: [], error: error.message }));
+      return true;
+
+    case 'findSimilarArticles':
+      findSimilarArticles(request.article || {}, await getGleanConfig())
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, articles: [], error: error.message }));
+      return true;
+
+    case 'initiateSlackOAuth':
+      initiateSlackOAuth()
+        .then(url => {
+          // Open OAuth URL in new tab
+          chrome.tabs.create({ url });
+          sendResponse({ success: true, url });
+        })
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'getSlackChannels':
+      getSlackChannels()
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, channels: [], error: error.message }));
+      return true;
+
+    case 'postToSlack':
+      postToSlack(request.channelId, request.text, request.clip || {})
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'checkSlackConnection':
+      checkSlackConnection()
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, connected: false, error: error.message }));
       return true;
 
     default:

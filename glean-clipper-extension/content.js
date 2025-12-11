@@ -1,7 +1,8 @@
 // Floating clip button that appears on text selection
-let clipButton = null;
+let radialMenu = null;
 let selectedText = '';
 let selectedElement = null;
+let radialStyleInjected = false;
 
 // Safe messaging wrapper for content script
 function safeRuntimeSendMessage(message) {
@@ -22,143 +23,167 @@ function safeRuntimeSendMessage(message) {
   });
 }
 
-// Create floating clip button
-function createClipButton() {
-  if (clipButton) {return clipButton;}
-
-  clipButton = document.createElement('div');
-  clipButton.id = 'glean-clip-button';
-  clipButton.innerHTML = `
-    <div class="glean-clip-btn">
-      <div class="clip-logo">G</div>
-      <span class="clip-text">Clip to Glean</span>
-      <div class="clip-arrow">→</div>
-    </div>
-  `;
-
-  clipButton.style.cssText = `
-    position: absolute;
-    z-index: 10000;
-    background: linear-gradient(135deg, #4F46E5, #6366F1);
-    color: white;
-    padding: 0;
-    border-radius: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    cursor: pointer;
-    box-shadow: 0 8px 32px rgba(79, 70, 229, 0.3), 0 4px 16px rgba(0, 0, 0, 0.1);
-    display: none;
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
-  `;
-
-  // Add inner styling for the button content
-  const btnContent = clipButton.querySelector('.glean-clip-btn');
-  btnContent.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    position: relative;
-  `;
-
-  // Style the G logo
-  const logo = clipButton.querySelector('.clip-logo');
-  logo.style.cssText = `
-    width: 24px;
-    height: 24px;
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    backdrop-filter: blur(4px);
-  `;
-
-  // Style the text
-  const text = clipButton.querySelector('.clip-text');
-  text.style.cssText = `
-    font-size: 14px;
-    font-weight: 600;
-    color: white;
-  `;
-
-  // Style the arrow
-  const arrow = clipButton.querySelector('.clip-arrow');
-  arrow.style.cssText = `
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.8);
-    transition: transform 0.2s ease;
-  `;
-
-  clipButton.addEventListener('mouseenter', () => {
-    clipButton.style.background = 'linear-gradient(135deg, #3730A3, #4338CA)';
-    clipButton.style.transform = 'scale(1.05) translateY(-2px)';
-    clipButton.style.boxShadow =
-      '0 12px 48px rgba(79, 70, 229, 0.4), 0 8px 24px rgba(0, 0, 0, 0.15)';
-
-    // Animate arrow on hover
-    const arrow = clipButton.querySelector('.clip-arrow');
-    if (arrow) {
-      arrow.style.transform = 'translateX(2px)';
-      arrow.style.color = 'white';
+// Inject styles for radial menu once
+function ensureRadialStyles() {
+  if (radialStyleInjected) return;
+  const style = document.createElement('style');
+  style.textContent = `
+    .glean-radial-menu {
+      position: absolute;
+      z-index: 10000;
+      width: 220px;
+      height: 220px;
+      display: none;
+      pointer-events: none;
     }
-
-    // Enhance logo on hover
-    const logo = clipButton.querySelector('.clip-logo');
-    if (logo) {
-      logo.style.background = 'rgba(255, 255, 255, 0.3)';
+    .glean-radial-menu .center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60px;
+      height: 60px;
+      border-radius: 999px;
+      background: #0f172a;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e5e7eb;
+      font-weight: 700;
+      pointer-events: auto;
+      cursor: pointer;
     }
-  });
-
-  clipButton.addEventListener('mouseleave', () => {
-    clipButton.style.background = 'linear-gradient(135deg, #4F46E5, #6366F1)';
-    clipButton.style.transform = 'scale(1) translateY(0)';
-    clipButton.style.boxShadow = '0 8px 32px rgba(79, 70, 229, 0.3), 0 4px 16px rgba(0, 0, 0, 0.1)';
-
-    // Reset arrow
-    const arrow = clipButton.querySelector('.clip-arrow');
-    if (arrow) {
-      arrow.style.transform = 'translateX(0)';
-      arrow.style.color = 'rgba(255, 255, 255, 0.8)';
+    .glean-radial-menu .item {
+      position: absolute;
+      width: 52px;
+      height: 52px;
+      border-radius: 999px;
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.28);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e5e7eb;
+      font-size: 12px;
+      pointer-events: auto;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease, color 120ms ease;
     }
-
-    // Reset logo
-    const logo = clipButton.querySelector('.clip-logo');
-    if (logo) {
-      logo.style.background = 'rgba(255, 255, 255, 0.2)';
+    .glean-radial-menu .item:hover {
+      background: #2563eb;
+      color: #fff;
+      transform: scale(1.06);
     }
-  });
-
-  clipButton.addEventListener('click', handleClip);
-  document.body.appendChild(clipButton);
-
-  return clipButton;
+    .glean-radial-menu .label {
+      position: absolute;
+      top: 58px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: 11px;
+      color: #cbd5e1;
+    }
+  `;
+  document.head.appendChild(style);
+  radialStyleInjected = true;
 }
 
-// Show clip button near selection
-function showClipButton(selection) {
-  const button = createClipButton();
+// Create radial menu
+function createRadialMenu() {
+  if (radialMenu) return radialMenu;
+  ensureRadialStyles();
+
+  radialMenu = document.createElement('div');
+  radialMenu.className = 'glean-radial-menu';
+  radialMenu.innerHTML = `
+    <div class="center" data-action="clip">G</div>
+    ${[
+      { action: 'clip', icon: '📌', label: 'Clip' },
+      { action: 'copy', icon: '📋', label: 'Copy' },
+      { action: 'saveUrl', icon: '🔗', label: 'URL' },
+      { action: 'capture', icon: '📸', label: 'Page' },
+      { action: 'notebook', icon: '📓', label: 'Notebook' },
+      { action: 'close', icon: '✕', label: 'Close' },
+    ]
+      .map((item, idx) => {
+        const angle = (Math.PI * 2 * idx) / 6;
+        const radius = 80;
+        const x = 110 + Math.cos(angle) * radius - 26;
+        const y = 110 + Math.sin(angle) * radius - 26;
+        return `
+          <div class="item" data-action="${item.action}" style="left:${x}px; top:${y}px;">
+            <span>${item.icon}</span>
+            <div class="label">${item.label}</div>
+          </div>
+        `;
+      })
+      .join('')}
+  `;
+
+  radialMenu.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.getAttribute('data-action');
+    handleRadialAction(action);
+  });
+
+  document.body.appendChild(radialMenu);
+  return radialMenu;
+}
+
+function handleRadialAction(action) {
+  switch (action) {
+    case 'clip':
+      handleClip();
+      break;
+    case 'copy':
+      if (selectedText) navigator.clipboard.writeText(selectedText);
+      break;
+    case 'saveUrl':
+      safeRuntimeSendMessage({
+        action: 'saveClip',
+        data: {
+          url: window.location.href,
+          title: document.title || '',
+          selectedText: '',
+          domain: window.location.hostname,
+          timestamp: Date.now(),
+        },
+      });
+      break;
+    case 'capture':
+      alert('Capture Page coming soon.');
+      break;
+    case 'notebook':
+      safeRuntimeSendMessage({ action: 'openNotebook' });
+      break;
+    default:
+      break;
+  }
+  hideRadialMenu();
+}
+
+// Show radial menu near selection
+function showRadialMenu(selection) {
+  const menu = createRadialMenu();
   const range = selection.getRangeAt(0);
   const rect = range.getBoundingClientRect();
 
-  button.style.display = 'flex';
-  button.style.left = `${rect.left + window.scrollX}px`;
-  button.style.top = `${rect.top + window.scrollY - 45}px`;
+  menu.style.display = 'block';
+  menu.style.left = `${rect.left + window.scrollX - 70}px`;
+  menu.style.top = `${rect.top + window.scrollY - 70}px`;
 
   selectedText = selection.toString().trim();
   selectedElement = range.commonAncestorContainer;
 }
 
-// Hide clip button
-function hideClipButton() {
-  if (clipButton) {
-    clipButton.style.display = 'none';
+// Hide radial menu
+function hideRadialMenu() {
+  if (radialMenu) {
+    radialMenu.style.display = 'none';
   }
 }
 
@@ -167,17 +192,17 @@ document.addEventListener('mouseup', e => {
   setTimeout(() => {
     const selection = window.getSelection();
     if (selection.rangeCount > 0 && selection.toString().trim()) {
-      showClipButton(selection);
+      showRadialMenu(selection);
     } else {
-      hideClipButton();
+      hideRadialMenu();
     }
   }, 10);
 });
 
-// Hide button when clicking elsewhere
+// Hide when clicking elsewhere
 document.addEventListener('mousedown', e => {
-  if (!clipButton?.contains(e.target)) {
-    hideClipButton();
+  if (!radialMenu?.contains(e.target)) {
+    hideRadialMenu();
   }
 });
 

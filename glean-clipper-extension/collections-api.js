@@ -30,8 +30,9 @@ class GleanCollectionsAPI {
 
     const url = `${this.baseUrl}/rest/api/v1/${endpoint}`;
 
-    // Use unified header creation with OAuth auth type
-    const headers = createCollectionsAPIHeaders(this.config.apiToken);
+    // Use unified header creation - use OAuth header if token is from OAuth flow
+    const isOAuthToken = this.config.authMethod === 'oauth';
+    const headers = createCollectionsAPIHeaders(this.config.apiToken, {}, isOAuthToken);
 
     console.log(`📡 Collections API Request: ${method} ${url}`);
     console.log('📦 Request data:', data);

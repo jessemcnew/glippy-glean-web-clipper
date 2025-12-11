@@ -1,0 +1,587 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Library</title>
+    <link rel="stylesheet" href="library.css" />
+  </head>
+  <body>
+    <div class="lib-shell">
+      <aside class="lib-sidebar">
+        <div class="lib-brand">
+          <div class="lib-logo">G</div>
+          <div>
+            <div class="lib-title">Library</div>
+            <div class="lib-sub" id="count-label">0 articles</div>
+          </div>
+        </div>
+        <div class="lib-search">
+          <svg viewBox="0 0 24 24"><path d="M11 4a7 7 0 1 1-4.95 11.95L4 17l1.05-2.05A7 7 0 0 1 11 4Z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+          <input id="search" type="search" placeholder="Search articles..." />
+        </div>
+        <nav class="lib-nav">
+          <button data-filter="all" class="active">All</button>
+          <button data-filter="starred">Starred</button>
+          <button data-filter="archived">Archived</button>
+        </nav>
+        <button id="auto-collections-btn" class="lib-action-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+          Auto Collections
+        </button>
+        <div class="lib-tags" id="tag-container"></div>
+      </aside>
+
+      <main class="lib-main">
+        <section class="lib-list" id="list"></section>
+        <section class="lib-reader" id="reader">
+          <div class="placeholder">
+            <div class="ph-icon">📖</div>
+            <div class="ph-title">Select an article</div>
+            <div class="ph-sub">Pick from your saved clips to read</div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module">
+      const listEl = document.getElementById('list');
+      const readerEl = document.getElementById('reader');
+      const searchEl = document.getElementById('search');
+      const countLabel = document.getElementById('count-label');
+      const tagContainer = document.getElementById('tag-container');
+      const collectionsNav = document.createElement('div');
+      collectionsNav.className = 'lib-nav';
+      tagContainer.insertAdjacentElement('beforebegin', collectionsNav);
+      let filter = 'all';
+      let articles = [];
+      let selectedId = null;
+      let collections = [];
+      let selectedCollection = '';
+
+      document.querySelectorAll('nav button[data-filter]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          filter = btn.getAttribute('data-filter');
+          render();
+        });
+      });
+
+      searchEl.addEventListener('input', () => render());
+
+      function deriveTags(items) {
+        const t = new Set();
+        items.forEach(a => (a.tags || []).forEach(tag => t.add(tag)));
+        return Array.from(t);
+      }
+
+      function renderTags(items) {
+        const tags = deriveTags(items);
+        tagContainer.innerHTML = tags.map(tag => `<span class="tag">${tag}</span>`).join('') || '<span class="tag muted">No tags</span>';
+      }
+
+      function filtered() {
+        const q = searchEl.value.toLowerCase().trim();
+        return articles.filter(a => {
+          const collectionMatch = !selectedCollection || String(a.collectionId || '') === String(selectedCollection);
+          const matchesFilter =
+            filter === 'all' ? !a.archived : filter === 'starred' ? a.starred && !a.archived : a.archived;
+          const matchesSearch =
+            !q ||
+            (a.title || '').toLowerCase().includes(q) ||
+            (a.excerpt || '').toLowerCase().includes(q) ||
+            (a.tags || []).some(t => t.toLowerCase().includes(q));
+          return matchesFilter && matchesSearch && collectionMatch;
+        });
+      }
+
+      // Add refresh function to reload data from API
+      async function refreshData() {
+        await loadData();
+      }
+
+      // Similar articles modal
+      let similarModal = null;
+      function createSimilarModal() {
+        if (similarModal) return similarModal;
+        similarModal = document.createElement('div');
+        similarModal.className = 'similar-modal';
+        similarModal.innerHTML = `
+          <div class="similar-modal-overlay" onclick="closeSimilarModal()"></div>
+          <div class="similar-modal-content">
+            <div class="similar-modal-header">
+              <h2>Similar Articles</h2>
+              <button class="similar-modal-close" onclick="closeSimilarModal()">×</button>
+            </div>
+            <div class="similar-modal-body" id="similar-results">
+              <div class="similar-loading">
+                <div class="spinner"></div>
+                <p>Searching for similar articles...</p>
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(similarModal);
+        return similarModal;
+      }
+
+      window.findSimilar = async function(articleId) {
+        const article = articles.find(a => String(a.id) === String(articleId));
+        if (!article) return;
+
+        const modal = createSimilarModal();
+        modal.style.display = 'flex';
+        const resultsEl = document.getElementById('similar-results');
+        resultsEl.innerHTML = `
+          <div class="similar-loading">
+            <div class="spinner"></div>
+            <p>Searching for similar articles...</p>
+          </div>
+        `;
+
+        try {
+          const result = await safeRuntimeSendMessage({
+            action: 'findSimilarArticles',
+            article: {
+              id: article.id,
+              title: article.title,
+              excerpt: article.excerpt,
+              url: article.url,
+            }
+          });
+
+          if (result?.success && result.articles?.length > 0) {
+            resultsEl.innerHTML = result.articles.map(a => `
+              <div class="similar-item">
+                <h3>${escapeHtml(a.title || 'Untitled')}</h3>
+                <p class="similar-snippet">${escapeHtml(a.snippet || a.description || '')}</p>
+                ${a.url ? `<a href="${escapeHtml(a.url)}" target="_blank" class="similar-link">View article →</a>` : ''}
+                ${a.relevanceScore ? `<span class="similar-score">${Math.round(a.relevanceScore * 100)}% match</span>` : ''}
+              </div>
+            `).join('');
+          } else {
+            resultsEl.innerHTML = `
+              <div class="similar-empty">
+                <p>No similar articles found.</p>
+                <p class="similar-hint">${result?.error || 'Try creating a "similar articles" agent in Glean Agent Builder.'}</p>
+              </div>
+            `;
+          }
+        } catch (e) {
+          console.error('Error finding similar articles:', e);
+          resultsEl.innerHTML = `
+            <div class="similar-empty">
+              <p>Error finding similar articles.</p>
+              <p class="similar-hint">${e.message || 'Please check your Glean connection.'}</p>
+            </div>
+          `;
+        }
+      };
+
+      window.closeSimilarModal = function() {
+        if (similarModal) similarModal.style.display = 'none';
+      };
+
+      // Auto-refresh every 30 seconds if on library page
+      let refreshInterval = null;
+      if (typeof window !== 'undefined') {
+        refreshInterval = setInterval(refreshData, 30000);
+        // Clear on page unload
+        window.addEventListener('beforeunload', () => {
+          if (refreshInterval) clearInterval(refreshInterval);
+        });
+      }
+
+      function renderCollectionsNav() {
+        if (!collections.length) {
+          collectionsNav.innerHTML = '<button class="active">All collections</button>';
+          return;
+        }
+        collectionsNav.innerHTML = [
+          `<button data-col="" ${selectedCollection === '' ? 'class="active"' : ''}>All</button>`,
+          ...collections.map(c => `<button data-col="${c.id}" ${String(c.id)===String(selectedCollection)?'class="active"':''}>${escapeHtml(c.name || 'Untitled')}</button>`)
+        ].join('');
+        collectionsNav.querySelectorAll('button').forEach(btn => {
+          btn.addEventListener('click', () => {
+            collectionsNav.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedCollection = btn.getAttribute('data-col') || '';
+            render();
+          });
+        });
+      }
+
+      function render() {
+        const items = filtered();
+        countLabel.textContent = `${items.length} article${items.length === 1 ? '' : 's'}`;
+        renderTags(items);
+        if (!items.length) {
+          listEl.innerHTML = '<div class="empty">No articles found</div>';
+          readerEl.innerHTML = placeholderHtml();
+          return;
+        }
+        listEl.innerHTML = items
+          .map(a => {
+            const active = a.id === selectedId;
+            return `
+              <article class="item ${active ? 'active' : ''}" data-id="${a.id}">
+                <div class="item-title">${escapeHtml(a.title || 'Untitled')}</div>
+                <div class="item-meta">${escapeHtml(a.date || '')} • ${escapeHtml(a.readTime || '')}</div>
+                <div class="item-excerpt">${escapeHtml((a.excerpt || '').slice(0, 140))}</div>
+                <button class="item-similar-btn" data-article-id="${a.id}" onclick="findSimilar('${a.id}')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                  Find Similar
+                </button>
+              </article>
+            `;
+          })
+          .join('');
+
+        listEl.querySelectorAll('.item').forEach(el => {
+          el.addEventListener('click', (e) => {
+            // Don't trigger if clicking the similar button
+            if (e.target.closest('.item-similar-btn')) return;
+            selectedId = el.getAttribute('data-id');
+            renderReader();
+            render(); // refresh active state
+          });
+        });
+
+        if (selectedId) renderReader();
+        else readerEl.innerHTML = placeholderHtml();
+      }
+
+      function renderReader() {
+        const a = articles.find(x => String(x.id) === String(selectedId));
+        if (!a) {
+          readerEl.innerHTML = placeholderHtml();
+          return;
+        }
+        const body = a.excerpt || '';
+        readerEl.innerHTML = `
+          <article class="reader-card">
+            <div class="reader-meta">${escapeHtml(a.date || '')} • ${escapeHtml(a.readTime || '')}</div>
+            <h1>${escapeHtml(a.title || 'Untitled')}</h1>
+            <div class="tags">${(a.tags || []).map(t => `<span>${escapeHtml(t)}</span>`).join('')}</div>
+            <p>${escapeHtml(body)}</p>
+            <button class="similar-articles-btn" onclick="findSimilar('${a.id}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+              Find Similar Articles
+            </button>
+          </article>
+        `;
+      }
+
+      function placeholderHtml() {
+        return `
+          <div class="placeholder">
+            <div class="ph-icon">📖</div>
+            <div class="ph-title">Select an article</div>
+            <div class="ph-sub">Pick from your saved clips to read</div>
+          </div>
+        `;
+      }
+
+      function escapeHtml(str='') {
+        return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;'}[m]));
+      }
+
+      async function safeRuntimeSendMessage(message) {
+        return new Promise((resolve) => {
+          try {
+            if (chrome?.runtime?.sendMessage) {
+              chrome.runtime.sendMessage(message, (res) => {
+                if (chrome.runtime.lastError) {
+                  console.warn('Runtime message error:', chrome.runtime.lastError.message);
+                  resolve(null);
+                } else {
+                  resolve(res || null);
+                }
+              });
+            } else {
+              resolve(null);
+            }
+          } catch (e) {
+            console.warn('Runtime message exception:', e);
+            resolve(null);
+          }
+        });
+      }
+
+      async function loadData() {
+        try {
+          // Fetch clips from Glean API first
+          const clipsResult = await safeRuntimeSendMessage({ 
+            action: 'fetchClipsFromGlean',
+            options: {}
+          });
+
+          if (clipsResult?.success && clipsResult.clips?.length > 0) {
+            articles = clipsResult.clips.map((c, idx) => ({
+              id: c.id || idx,
+              title: c.title || 'Untitled',
+              url: c.url || '',
+              excerpt: c.description || c.selectedText || c.title || '',
+              date: c.timestamp ? new Date(c.timestamp).toLocaleDateString() : 
+                    (c.addedAt ? new Date(c.addedAt).toLocaleDateString() : ''),
+              readTime: (c.description || c.selectedText) ? 
+                       `${Math.max(1, Math.ceil((c.description || c.selectedText).length / 1000))} min` : '',
+              tags: c.tags || [],
+              starred: !!c.starred,
+              archived: !!c.archived,
+              read: !!c.read,
+              collectionId: c.collectionId || c.gleanCollectionId || '',
+            }));
+            console.log(`Loaded ${articles.length} articles from Glean API`);
+          } else {
+            // Fallback to local storage
+            if (chrome?.storage?.local) {
+              const res = await chrome.storage.local.get(['clips']);
+              const clips = res.clips || [];
+              articles = clips.map((c, idx) => ({
+                id: c.id || idx,
+                title: c.title || 'Untitled',
+                url: c.url || '',
+                excerpt: c.selectedText || c.title || '',
+                date: c.timestamp ? new Date(c.timestamp).toLocaleDateString() : '',
+                readTime: c.selectedText ? `${Math.max(1, Math.ceil(c.selectedText.length / 1000))} min` : '',
+                tags: c.tags || [],
+                starred: !!c.starred,
+                archived: !!c.archived,
+                read: !!c.read,
+                collectionId: c.collectionId || c.gleanCollectionId || '',
+              }));
+              console.log(`Loaded ${articles.length} articles from local storage`);
+            } else {
+              articles = [];
+            }
+          }
+        } catch (e) {
+          console.error('Error loading articles:', e);
+          // Final fallback to local storage
+          try {
+            if (chrome?.storage?.local) {
+              const res = await chrome.storage.local.get(['clips']);
+              const clips = res.clips || [];
+              articles = clips.map((c, idx) => ({
+                id: c.id || idx,
+                title: c.title || 'Untitled',
+                url: c.url || '',
+                excerpt: c.selectedText || c.title || '',
+                date: c.timestamp ? new Date(c.timestamp).toLocaleDateString() : '',
+                readTime: c.selectedText ? `${Math.max(1, Math.ceil(c.selectedText.length / 1000))} min` : '',
+                tags: c.tags || [],
+                starred: !!c.starred,
+                archived: !!c.archived,
+                read: !!c.read,
+                collectionId: c.collectionId || c.gleanCollectionId || '',
+              }));
+            } else {
+              articles = [];
+            }
+          } catch (e2) {
+            articles = [];
+          }
+        }
+
+        // Fetch collections from API
+        try {
+          const collectionsResult = await safeRuntimeSendMessage({ action: 'fetchCollections' });
+          if (collectionsResult?.success && Array.isArray(collectionsResult.collections)) {
+            collections = collectionsResult.collections;
+            console.log(`Loaded ${collections.length} collections from API`);
+          } else {
+            collections = [];
+          }
+        } catch (e) {
+          console.error('Error loading collections:', e);
+          collections = [];
+        }
+
+        renderCollectionsNav();
+        render();
+      }
+
+      // Auto Collections Modal
+      let autoCollectionsModal = null;
+      function createAutoCollectionsModal() {
+        if (autoCollectionsModal) return autoCollectionsModal;
+        autoCollectionsModal = document.createElement('div');
+        autoCollectionsModal.className = 'similar-modal';
+        autoCollectionsModal.innerHTML = `
+          <div class="similar-modal-overlay" onclick="closeAutoCollections()"></div>
+          <div class="similar-modal-content" style="max-width: 700px;">
+            <div class="similar-modal-header">
+              <h2>Auto Collections</h2>
+              <button class="similar-modal-close" onclick="closeAutoCollections()">×</button>
+            </div>
+            <div class="similar-modal-body">
+              <div class="auto-collections-form">
+                <div class="auto-collections-field">
+                  <label>Collection Name</label>
+                  <input type="text" id="auto-collection-name" class="auto-collections-input" placeholder="e.g., Work Articles" />
+                </div>
+                <div class="auto-collections-rules">
+                  <div class="auto-collections-rules-header">
+                    <label>Rules</label>
+                    <button class="auto-collections-add-rule" onclick="addAutoRule()">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                      Add Rule
+                    </button>
+                  </div>
+                  <div id="auto-collections-rules-list" class="auto-collections-rules-list"></div>
+                </div>
+                <button class="auto-collections-save" onclick="saveAutoCollection()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <path d="M17 21v-8H7v8M7 3v5h8" />
+                  </svg>
+                  Save Collection
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(autoCollectionsModal);
+        return autoCollectionsModal;
+      }
+
+      let autoCollectionRules = [];
+      function addAutoRule() {
+        const rule = {
+          id: Date.now().toString(),
+          type: 'tag',
+          operator: 'contains',
+          value: '',
+        };
+        autoCollectionRules.push(rule);
+        renderAutoRules();
+      }
+
+      function removeAutoRule(id) {
+        autoCollectionRules = autoCollectionRules.filter(r => r.id !== id);
+        renderAutoRules();
+      }
+
+      function renderAutoRules() {
+        const listEl = document.getElementById('auto-collections-rules-list');
+        if (!listEl) return;
+        
+        if (autoCollectionRules.length === 0) {
+          listEl.innerHTML = '<div class="auto-collections-empty">No rules yet. Click "Add Rule" to get started.</div>';
+          return;
+        }
+
+        listEl.innerHTML = autoCollectionRules.map((rule, idx) => `
+          <div class="auto-collections-rule" data-id="${rule.id}">
+            <div class="auto-collections-rule-header">
+              <span>Rule ${idx + 1}</span>
+              <button class="auto-collections-remove-rule" onclick="removeAutoRule('${rule.id}')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </div>
+            <div class="auto-collections-rule-fields">
+              <select class="auto-collections-select" onchange="updateAutoRule('${rule.id}', 'type', this.value)">
+                <option value="tag" ${rule.type === 'tag' ? 'selected' : ''}>Tag</option>
+                <option value="keyword" ${rule.type === 'keyword' ? 'selected' : ''}>Keyword</option>
+                <option value="dateRange" ${rule.type === 'dateRange' ? 'selected' : ''}>Date Range</option>
+              </select>
+              <select class="auto-collections-select" onchange="updateAutoRule('${rule.id}', 'operator', this.value)">
+                ${rule.type === 'dateRange' ? `
+                  <option value="before" ${rule.operator === 'before' ? 'selected' : ''}>Before</option>
+                  <option value="after" ${rule.operator === 'after' ? 'selected' : ''}>After</option>
+                  <option value="between" ${rule.operator === 'between' ? 'selected' : ''}>Between</option>
+                ` : `
+                  <option value="contains" ${rule.operator === 'contains' ? 'selected' : ''}>Contains</option>
+                  <option value="equals" ${rule.operator === 'equals' ? 'selected' : ''}>Equals</option>
+                `}
+              </select>
+            </div>
+            ${rule.operator === 'between' ? `
+              <div class="auto-collections-rule-fields">
+                <input type="date" class="auto-collections-input" value="${rule.value || ''}" onchange="updateAutoRule('${rule.id}', 'value', this.value)" />
+                <input type="date" class="auto-collections-input" value="${rule.value2 || ''}" onchange="updateAutoRule('${rule.id}', 'value2', this.value)" />
+              </div>
+            ` : `
+              <input type="${rule.type === 'dateRange' ? 'date' : 'text'}" 
+                     class="auto-collections-input" 
+                     placeholder="${rule.type === 'tag' ? 'Enter tag...' : rule.type === 'keyword' ? 'Enter keyword...' : 'Select date...'}"
+                     value="${rule.value || ''}"
+                     onchange="updateAutoRule('${rule.id}', 'value', this.value)" />
+            `}
+          </div>
+        `).join('');
+      }
+
+      window.updateAutoRule = function(id, field, value) {
+        const rule = autoCollectionRules.find(r => r.id === id);
+        if (!rule) return;
+        rule[field] = value;
+        if (field === 'type') {
+          // Reset operator based on type
+          rule.operator = (value === 'dateRange') ? 'before' : 'contains';
+        }
+        renderAutoRules();
+      };
+
+      window.saveAutoCollection = async function() {
+        const nameEl = document.getElementById('auto-collection-name');
+        const name = nameEl?.value.trim();
+        if (!name || autoCollectionRules.length === 0) {
+          alert('Please enter a collection name and add at least one rule.');
+          return;
+        }
+
+        const collection = {
+          id: Date.now().toString(),
+          name,
+          rules: autoCollectionRules,
+          createdAt: Date.now(),
+        };
+
+        try {
+          if (chrome?.storage?.local) {
+            const res = await chrome.storage.local.get(['autoCollections']);
+            const collections = res.autoCollections || [];
+            collections.push(collection);
+            await chrome.storage.local.set({ autoCollections: collections });
+            alert('Auto collection saved!');
+            closeAutoCollections();
+            // Reset form
+            nameEl.value = '';
+            autoCollectionRules = [];
+            renderAutoRules();
+          }
+        } catch (e) {
+          console.error('Error saving auto collection:', e);
+          alert('Failed to save collection.');
+        }
+      };
+
+      window.closeAutoCollections = function() {
+        if (autoCollectionsModal) autoCollectionsModal.style.display = 'none';
+      };
+
+      document.getElementById('auto-collections-btn')?.addEventListener('click', () => {
+        const modal = createAutoCollectionsModal();
+        modal.style.display = 'flex';
+        renderAutoRules();
+      });
+
+      loadData();
+    </script>
+  </body>
+</html>
+

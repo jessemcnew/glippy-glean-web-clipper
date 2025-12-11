@@ -228,6 +228,7 @@ async function getGleanConfig() {
         indexingEnabled: config.indexingEnabled || false,
         indexingToken: config.indexingToken || '',
         datasource: config.datasource || 'WEBCLIPPER',
+        authMethod: config.authMethod, // 'oauth' or undefined for manual tokens
       });
     });
   });

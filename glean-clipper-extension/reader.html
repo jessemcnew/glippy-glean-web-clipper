@@ -1,0 +1,181 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Reader</title>
+    <link rel="stylesheet" href="reader.css" />
+  </head>
+  <body>
+    <div class="reader-shell">
+      <header class="reader-header">
+        <div>
+          <h1>Saved Clips</h1>
+          <p id="clip-count">0 items</p>
+        </div>
+        <div class="search">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M11 4a7 7 0 1 1-4.95 11.95L4 17l1.05-2.05A7 7 0 0 1 11 4Z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+          <input id="search" type="search" placeholder="Search clips..." />
+        </div>
+        <div class="view-toggle">
+          <button id="grid-btn" class="active">▦</button>
+          <button id="list-btn">☰</button>
+        </div>
+      </header>
+
+      <main id="content" class="grid"></main>
+      <div id="empty-state" class="empty">
+        <div class="empty-icon">📄</div>
+        <div class="empty-title">No clips yet</div>
+        <div class="empty-sub">Select text and clip to see items here.</div>
+      </div>
+    </div>
+
+    <script type="module">
+      const content = document.getElementById('content');
+      const emptyState = document.getElementById('empty-state');
+      const clipCount = document.getElementById('clip-count');
+      const search = document.getElementById('search');
+      const gridBtn = document.getElementById('grid-btn');
+      const listBtn = document.getElementById('list-btn');
+
+      let view = 'grid';
+      let clips = [];
+
+      function setView(v) {
+        view = v;
+        content.className = v;
+        gridBtn.classList.toggle('active', v === 'grid');
+        listBtn.classList.toggle('active', v === 'list');
+        render();
+      }
+
+      gridBtn.addEventListener('click', () => setView('grid'));
+      listBtn.addEventListener('click', () => setView('list'));
+
+      search.addEventListener('input', () => render());
+
+      function filteredClips() {
+        const q = search.value.toLowerCase().trim();
+        return clips.filter(c => {
+          if (!q) return true;
+          return (c.title || '').toLowerCase().includes(q) ||
+                 (c.selectedText || '').toLowerCase().includes(q) ||
+                 (c.domain || '').toLowerCase().includes(q);
+        });
+      }
+
+      function render() {
+        const items = filteredClips();
+        clipCount.textContent = `${items.length} item${items.length === 1 ? '' : 's'}`;
+        emptyState.style.display = items.length ? 'none' : 'flex';
+        content.innerHTML = items.map(c => {
+          const date = c.timestamp ? new Date(c.timestamp).toLocaleString() : '';
+          const body = (c.selectedText || c.title || '').slice(0, 160);
+          const status = c.syncStatus || (c.collectionId ? 'synced' : 'pending');
+          return `
+            <article class="card">
+              <div class="card-title">${escapeHtml(c.title || 'Untitled')}</div>
+              <div class="card-meta">${escapeHtml(c.domain || '')}${date ? ' • ' + date : ''}</div>
+              <div class="card-body">${escapeHtml(body)}</div>
+              <div class="card-footer">
+                <span class="badge ${status}">${status}</span>
+                <div class="actions">
+                  ${c.url ? `<button data-action="open" data-url="${escapeAttr(c.url)}">Open</button>` : ''}
+                  <button data-action="copy" data-text="${escapeAttr(c.selectedText || c.title || '')}">Copy</button>
+                </div>
+              </div>
+            </article>
+          `;
+        }).join('');
+
+        content.querySelectorAll('button[data-action="open"]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const url = btn.getAttribute('data-url');
+            if (url) window.open(url, '_blank');
+          });
+        });
+        content.querySelectorAll('button[data-action="copy"]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const text = btn.getAttribute('data-text') || '';
+            navigator.clipboard.writeText(text);
+          });
+        });
+      }
+
+      function escapeHtml(str='') {
+        return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;'}[m]));
+      }
+      function escapeAttr(str='') { return escapeHtml(str); }
+
+      async function safeRuntimeSendMessage(message) {
+        return new Promise((resolve) => {
+          try {
+            if (chrome?.runtime?.sendMessage) {
+              chrome.runtime.sendMessage(message, (res) => {
+                if (chrome.runtime.lastError) {
+                  console.warn('Runtime message error:', chrome.runtime.lastError.message);
+                  resolve(null);
+                } else {
+                  resolve(res || null);
+                }
+              });
+            } else {
+              resolve(null);
+            }
+          } catch (e) {
+            console.warn('Runtime message exception:', e);
+            resolve(null);
+          }
+        });
+      }
+
+      async function loadClips() {
+        try {
+          // Try to fetch from Glean API first
+          const apiResult = await safeRuntimeSendMessage({ 
+            action: 'fetchClipsFromGlean',
+            options: {}
+          });
+
+          if (apiResult?.success && apiResult.clips?.length > 0) {
+            clips = apiResult.clips.map(clip => ({
+              ...clip,
+              timestamp: clip.timestamp || (clip.addedAt ? new Date(clip.addedAt).getTime() : Date.now()),
+              selectedText: clip.description || clip.selectedText || '',
+              domain: clip.domain || (clip.url ? new URL(clip.url).hostname : ''),
+              syncStatus: clip.synced ? 'synced' : 'pending',
+              collectionId: clip.collectionId || '',
+            }));
+            console.log(`Loaded ${clips.length} clips from Glean API`);
+          } else {
+            // Fallback to local storage
+            if (chrome?.storage?.local) {
+              const res = await chrome.storage.local.get(['clips']);
+              clips = res.clips || [];
+              console.log(`Loaded ${clips.length} clips from local storage`);
+            } else {
+              clips = [];
+            }
+          }
+        } catch (e) {
+          console.error('Error loading clips:', e);
+          // Final fallback to local storage
+          try {
+            if (chrome?.storage?.local) {
+              const res = await chrome.storage.local.get(['clips']);
+              clips = res.clips || [];
+            } else {
+              clips = [];
+            }
+          } catch (e2) {
+            clips = [];
+          }
+        }
+        render();
+      }
+
+      loadClips();
+    </script>
+  </body>
+</html>
+
