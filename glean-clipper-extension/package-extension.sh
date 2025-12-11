@@ -49,16 +49,22 @@ zip -r "$OUTPUT_FILE" . \
     -x ".playwright-mcp/*" \
     -x ".deepagent-desktop/*" \
     -x ".husky/*" \
+    -x ".vscode/*" \
     -x ".prettierrc" \
     -x ".prettierignore" \
     -x "eslint.config.mjs" \
     -x "package.json" \
     -x "package-lock.json" \
     -x "*.log" \
+    -x "logs/*" \
     -x "*.DS_Store" \
     -x "*.swp" \
     -x "*.swo" \
-    -x "*~"
+    -x "*~" \
+    -x "Glean Extension/*" \
+    -x "Users/*" \
+    -x "glean-clipper-v*.zip" \
+    -x "*.zip"
 
 if [ $? -eq 0 ]; then
     echo ""
