@@ -212,4 +212,4 @@ If you need to update the privacy policy:
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 11, 2025*
