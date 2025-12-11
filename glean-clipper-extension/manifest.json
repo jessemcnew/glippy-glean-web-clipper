@@ -2,11 +2,21 @@
   "manifest_version": 3,
   "name": "Glean Web Clipper",
   "version": "1.0",
-  "description": "Clip web content to your personal Glean knowledge base",
+  "description": "Clip web content to your personal Glean knowledge base. Save articles, notes, and web pages directly to your Glean collections.",
 
   "permissions": ["activeTab", "storage", "contextMenus", "scripting", "identity"],
 
-  "host_permissions": ["http://*/*", "https://*/*", "https://linkedin-be.glean.com/*"],
+  "host_permissions": [
+    "https://*/*"
+  ],
+  
+  "externally_connectable": {
+    "matches": ["http://localhost:*/*", "http://127.0.0.1:*/*"]
+  },
+  
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  },
 
   "background": {
     "service_worker": "background.js",
@@ -39,7 +49,17 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["clipper-widget.html", "datasource-checker.html", "notebook-viewer.html"],
+      "resources": [
+        "clipper-widget.html",
+        "datasource-checker.html",
+        "notebook-viewer.html",
+        "reader.html",
+        "library.html",
+        "prompts.html",
+        "reader.css",
+        "library.css",
+        "prompts.css"
+      ],
       "matches": ["<all_urls>"]
     }
   ]
