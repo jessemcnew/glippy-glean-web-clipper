@@ -50,15 +50,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "clipper-widget.html",
-        "datasource-checker.html",
-        "notebook-viewer.html",
         "reader.html",
-        "library.html",
-        "prompts.html",
         "reader.css",
-        "library.css",
-        "prompts.css",
         "dashboard/*"
       ],
       "matches": ["<all_urls>"]

@@ -8,9 +8,26 @@ Glippy transforms Glean from a company-wide search platform into a personal know
 
 ```
 glippy/
-  glean-clipper-extension/   # Chrome extension (vanilla JS, manifest v3)
-  glean-dashboard/           # Next.js 15 React dashboard (static export)
-  build-extension.sh         # Builds dashboard and bundles into extension
+├── glean-clipper-extension/   # Chrome extension (vanilla JS, manifest v3)
+│   ├── modules/               # JS modules (gleanApi.js, apiFetch.js, etc.)
+│   ├── tests/                 # Playwright E2E tests
+│   ├── docs/                  # Extension-specific documentation
+│   ├── scripts/               # Build/utility scripts
+│   ├── archive/               # Obsolete files (old HTML, unused JS)
+│   └── dashboard/             # Bundled Next.js static files (generated)
+├── glean-dashboard/           # Next.js 15 React dashboard (static export)
+│   └── src/
+│       ├── app/               # Next.js app router pages
+│       ├── components/        # React components
+│       ├── contexts/          # React contexts (Auth, Theme, Toast)
+│       └── lib/               # Utilities and services
+├── docs/                      # Project documentation
+│   ├── guides/                # How-to guides and features
+│   ├── setup/                 # Installation and configuration
+│   ├── testing/               # Test plans and QA docs
+│   └── chrome-store/          # Chrome Web Store submission docs
+├── archive/                   # Archived/obsolete projects and files
+└── build-extension.sh         # Builds dashboard and bundles into extension
 ```
 
 ### Chrome Extension (`glean-clipper-extension/`)
@@ -128,8 +145,11 @@ The extension supports keyboard shortcuts via the command palette:
 - [x] Command palette with keyboard shortcuts
 - [x] Modern popup UI design
 - [x] Playwright E2E test suite
-- [ ] Connect popup to live extension data
-- [ ] Fix Preferences modal functionality
+- [x] Theme switching (light/dark/system) with preferences
+- [x] Project folder reorganization (docs, archive structure)
+- [x] Fixed RSC payload fetch errors (replaced Next.js Link with anchor tags)
+- [ ] Connect popup to live extension data (collections, clips)
+- [ ] Full preferences modal save/load cycle
 - [ ] Search within clips
 - [ ] Tag management
 
@@ -210,3 +230,60 @@ To create new UI designs:
 mcp__v0__createChat({ message: "Create a..." })
 mcp__v0__findChats()  // Find existing designs
 ```
+
+---
+
+## Session Handoff
+
+This section helps new Claude Code sessions pick up where the last one left off.
+
+### Recent Work (Dec 2024)
+
+**Completed:**
+1. **RSC Payload Fix**: Replaced Next.js `Link` components with regular `<a>` tags in Dashboard.tsx, library/page.tsx, and prompts/page.tsx to fix "Failed to fetch RSC payload" errors in chrome-extension:// context
+2. **Theme System**: Added light/dark/system theme switching with `applyTheme()` function in popup.js and light theme CSS overrides in popup-modern.css
+3. **Project Reorganization**:
+   - Moved 15+ root markdown files to `docs/` subdirectories (guides, setup, testing, chrome-store)
+   - Archived obsolete projects to `archive/` (linkedin-profile-updater, obsidian-project-vault)
+   - Organized extension folder: docs to `docs/`, scripts to `scripts/`, old HTML to `archive/old-html/`
+   - Updated manifest.json to remove references to archived files
+
+**Pending Tasks:**
+1. **Connect popup to live extension data**: The popup currently uses mock data. Need to wire up `chrome.runtime.sendMessage` calls to fetch real collections and clips from storage
+2. **Preferences modal**: The modal opens but save/load cycle needs testing and potential fixes
+3. **Dashboard data connection**: Dashboard pages (library, prompts) use mock data; need to connect to extension storage via message passing
+
+### Key Files to Know
+
+| File | Purpose |
+|------|---------|
+| `popup.js` | Main popup logic, handles UI interactions and extension messaging |
+| `popup-modern.css` | Popup styling including light theme overrides (search `body.light-theme`) |
+| `background.js` | Service worker handling API calls and message routing |
+| `Dashboard.tsx` | Main dashboard component, uses regular anchor tags for navigation |
+| `clips-service.ts` | Clips data fetching for dashboard |
+
+### Known Issues
+
+1. **AddCollectionItems API 400 Error**: Glean API rejects some test URLs. This is a backend validation issue, not a code bug
+2. **Preferences not persisting**: Theme preference saves to `chrome.storage.local` but may not apply on popup reopen
+3. **Mock data in dashboard**: Library and Prompts pages show mock data, not real clips
+
+### Quick Start for New Session
+
+```bash
+# Build and test the extension
+./build-extension.sh
+
+# Run Playwright tests
+cd glean-clipper-extension && npm run test:playwright
+
+# Check for lint errors
+cd glean-dashboard && npm run lint
+```
+
+### Architecture Quick Reference
+
+- **Popup** (popup.js) → sends messages → **Background** (background.js) → calls → **Glean API**
+- **Dashboard** (Next.js) → sends messages → **Background** → reads/writes → **chrome.storage.local**
+- **Content scripts** (content.js, command-palette.js) → injected on all pages → send messages → **Background**
