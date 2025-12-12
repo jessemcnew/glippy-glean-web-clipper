@@ -218,17 +218,67 @@ The `fix-csp.js` script sets `globalThis.__NEXT_BASE` correctly for each HTML fi
 ### Playwright tests fail to find extension
 Ensure the extension path is correct and Chrome is installed. Tests use `chromium.launchPersistentContext` with extension flags.
 
-## v0.app Integration
+## Design System
+
+**IMPORTANT**: See `.cursorrules` for complete design guidelines.
+
+### Core Principles
+1. **NO EMOJIS** - Never use emojis in code, documentation, UI, or commit messages
+2. **All new UI designs MUST be created in v0.app first**
+3. **All icons MUST use lucide-react** - no mixing icon libraries
+4. **All components MUST support light and dark themes**
+
+### Color Palette (Zinc-based)
+```
+Background:  bg-white dark:bg-zinc-950
+Surface:     bg-zinc-50 dark:bg-zinc-900
+Border:      border-zinc-200 dark:border-zinc-800
+Text:        text-zinc-900 dark:text-zinc-100
+Muted:       text-zinc-500 dark:text-zinc-400
+```
+
+### Icon Standards
+- Library: lucide-react ONLY
+- Sizes: h-4 w-4 (inline), h-5 w-5 (buttons), h-3.5 w-3.5 (small)
+- Colors: Match theme (text-zinc-400, text-zinc-600, etc.)
+
+### v0.app Integration
 
 UI designs are created using v0.app MCP integration. Key v0 chats for reference:
 - Command palette design: `h0pN3O1OOxs`
-- Popup modern UI design: (search v0 chats for "popup" or "glippy")
+- Feedback modal: (created Dec 2024)
+- Dashboard layout: (created Dec 2024)
 
 To create new UI designs:
 ```javascript
 // Use the v0 MCP tools
 mcp__v0__createChat({ message: "Create a..." })
 mcp__v0__findChats()  // Find existing designs
+```
+
+### Design Checklist for New Components
+- [ ] Created in v0.app first
+- [ ] Uses lucide-react icons only
+- [ ] Supports light/dark theme
+- [ ] Uses zinc color palette
+- [ ] Uses shadcn/ui base components where applicable
+
+## Security Rules
+
+### API Keys & Secrets
+- **NEVER commit API keys, tokens, or secrets to git**
+- Use `.env.local` or `.env.test.local` for local development
+- All `.env*` files (except templates) are gitignored
+- Chrome storage (`chrome.storage.local`) for runtime token storage only
+- Review diffs before committing for accidental secrets
+
+### Protected Patterns in .gitignore
+```
+.env*
+.env.local
+.env.test.local
+*.pem
+*_context.txt
 ```
 
 ---
@@ -287,3 +337,4 @@ cd glean-dashboard && npm run lint
 - **Popup** (popup.js) → sends messages → **Background** (background.js) → calls → **Glean API**
 - **Dashboard** (Next.js) → sends messages → **Background** → reads/writes → **chrome.storage.local**
 - **Content scripts** (content.js, command-palette.js) → injected on all pages → send messages → **Background**
+- please use subagents whenver possible if it makes sense to

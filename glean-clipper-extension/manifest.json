@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Glean Web Clipper",
-  "version": "1.0",
+  "version": "0.1.0",
   "description": "Clip web content to your personal Glean knowledge base. Save articles, notes, and web pages directly to your Glean collections.",
 
   "permissions": ["activeTab", "storage", "contextMenus", "scripting", "identity"],

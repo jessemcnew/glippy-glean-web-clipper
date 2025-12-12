@@ -1111,3 +1111,74 @@ body.light-theme .slack-textarea {
   color: #111827;
 }
 
+/* Connection Status Footer */
+.popup-footer {
+  padding: 8px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6b7280;
+  flex-shrink: 0;
+}
+
+.connection-indicator.connected .connection-dot {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+}
+
+.connection-indicator.connected .connection-text {
+  color: #34d399;
+}
+
+.connection-indicator.disconnected .connection-dot {
+  background: #6b7280;
+}
+
+.connection-indicator.disconnected .connection-text {
+  color: #9ca3af;
+}
+
+.connection-indicator.error .connection-dot {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+.connection-indicator.error .connection-text {
+  color: #f87171;
+}
+
+/* Light theme connection indicator */
+body.light-theme .popup-footer {
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+body.light-theme .connection-indicator {
+  color: #6b7280;
+}
+
+body.light-theme .connection-indicator.connected .connection-text {
+  color: #16a34a;
+}
+
+body.light-theme .connection-indicator.disconnected .connection-text {
+  color: #6b7280;
+}
+
+body.light-theme .connection-indicator.error .connection-text {
+  color: #dc2626;
+}
+

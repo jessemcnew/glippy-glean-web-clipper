@@ -611,18 +611,47 @@ async function saveSettings() {
   }
 }
 
-function updateConnectionStatus(config) {
+function updateConnectionStatus(config, connectionState = null) {
   const statusEl = getElement('connection-status');
-  if (!statusEl) return;
+  const footerStatusEl = getElement('popup-connection-status');
 
   // Check if enabled, domain set, and has token
   const hasToken = !!(config.apiToken || config.clientToken);
-  if (config.enabled && config.domain && hasToken) {
-    statusEl.textContent = 'Ready';
-    statusEl.className = 'status-badge ready';
-  } else {
-    statusEl.textContent = 'Disconnected';
-    statusEl.className = 'status-badge disconnected';
+  const isConfigured = config.enabled && config.domain && hasToken;
+
+  // Determine connection state
+  let state = 'disconnected';
+  let text = 'Not connected';
+
+  if (connectionState === 'connected') {
+    state = 'connected';
+    text = 'Connected to Glean';
+  } else if (connectionState === 'error') {
+    state = 'error';
+    text = 'Connection error';
+  } else if (isConfigured) {
+    state = 'connected';
+    text = 'Connected to Glean';
+  }
+
+  // Update settings panel badge
+  if (statusEl) {
+    if (state === 'connected') {
+      statusEl.textContent = 'Ready';
+      statusEl.className = 'status-badge ready';
+    } else {
+      statusEl.textContent = 'Disconnected';
+      statusEl.className = 'status-badge disconnected';
+    }
+  }
+
+  // Update footer indicator
+  if (footerStatusEl) {
+    footerStatusEl.className = `connection-indicator ${state}`;
+    const textEl = footerStatusEl.querySelector('.connection-text');
+    if (textEl) {
+      textEl.textContent = text;
+    }
   }
 }
 
@@ -1239,23 +1268,27 @@ async function testConnection() {
     const response = await Promise.race([testPromise, timeoutPromise]);
 
     if (response?.success) {
-      // Connection successful - now fetch collections automatically
+      // Connection successful - update footer status
+      const config = await chrome.storage.local.get(['gleanConfig']);
+      updateConnectionStatus(config.gleanConfig || {}, 'connected');
+
+      // Now fetch collections automatically
       testBtn.textContent = 'Loading collections...';
-      
+
       try {
         const collectionsResponse = await safeRuntimeSendMessage({
           action: 'fetchCollections',
         });
-        
+
         if (collectionsResponse?.success && collectionsResponse.collections?.length > 0) {
           // Update collections and populate dropdown
           // Note: collectionsResponse.collections should already be filtered by fetchGleanCollections()
           collections = collectionsResponse.collections || [];
           console.log(`✅ Test Connection: Loaded ${collections.length} filtered collections`);
-          
+
           // Collections tab removed - no need to render
           populateSettingsCollectionDropdown();
-          
+
           alert(`✅ Connection successful!\n\nLoaded ${collections.length} collection(s). You can now select one from the dropdown.`);
         } else if (collectionsResponse?.error) {
           alert(`✅ Connection successful, but couldn't load collections:\n${collectionsResponse.error}\n\nYou can still enter a collection ID manually.`);
@@ -1267,6 +1300,10 @@ async function testConnection() {
         alert('✅ Connection successful! Collections could not be loaded automatically. You may need to enter a collection ID manually.');
       }
     } else {
+      // Connection failed - update footer status to error
+      const config = await chrome.storage.local.get(['gleanConfig']);
+      updateConnectionStatus(config.gleanConfig || {}, 'error');
+
       const errorMsg = response?.error || 'Unknown error';
       const details = response?.details ? `\n\nDebug Info:\n${JSON.stringify(response.details, null, 2)}` : '';
       alert('❌ Connection failed:\n\n' + errorMsg + details);

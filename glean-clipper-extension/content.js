@@ -1,8 +1,28 @@
-// Floating clip button that appears on text selection
+// Glippy Radial Command Menu - Content Script
+// Appears when user highlights text on a webpage
+
 let radialMenu = null;
 let selectedText = '';
 let selectedElement = null;
 let radialStyleInjected = false;
+
+// SVG icons (lucide-react equivalents)
+const ICONS = {
+  scissors: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg>`,
+  fileText: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>`,
+  link: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
+  search: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+};
+
+// Menu options - 4 buttons at 90-degree intervals
+const MENU_OPTIONS = [
+  { id: 'clip-text', icon: ICONS.scissors, label: 'Clip Text', angle: 0 },
+  { id: 'clip-page', icon: ICONS.fileText, label: 'Clip Page', angle: 90 },
+  { id: 'clip-url', icon: ICONS.link, label: 'Clip URL', angle: 180 },
+  { id: 'search-glean', icon: ICONS.search, label: 'Search Glean', angle: 270 },
+];
+
+const RADIUS = 90; // Distance from center to buttons
 
 // Safe messaging wrapper for content script
 function safeRuntimeSendMessage(message) {
@@ -23,72 +43,264 @@ function safeRuntimeSendMessage(message) {
   });
 }
 
+// Check if user wants to hide the tooltip
+function shouldShowTooltip() {
+  try {
+    return localStorage.getItem('glippy-hide-radial-tooltip') !== 'true';
+  } catch {
+    return true;
+  }
+}
+
+// Dismiss tooltip permanently
+function dismissTooltip() {
+  try {
+    localStorage.setItem('glippy-hide-radial-tooltip', 'true');
+    const tooltip = document.querySelector('.glippy-radial-tooltip');
+    if (tooltip) tooltip.remove();
+  } catch {
+    // localStorage not available
+  }
+}
+
 // Inject styles for radial menu once
 function ensureRadialStyles() {
   if (radialStyleInjected) return;
   const style = document.createElement('style');
+  style.id = 'glippy-radial-styles';
   style.textContent = `
-    .glean-radial-menu {
-      position: absolute;
-      z-index: 10000;
-      width: 220px;
-      height: 220px;
-      display: none;
+    /* Radial Menu Container */
+    .glippy-radial-menu {
+      position: fixed;
+      z-index: 2147483647;
       pointer-events: none;
     }
-    .glean-radial-menu .center {
+
+    .glippy-radial-inner {
+      position: relative;
+      pointer-events: auto;
+    }
+
+    /* Center Circle with G */
+    .glippy-radial-center {
       position: absolute;
+      left: 50%;
       top: 50%;
-      left: 50%;
       transform: translate(-50%, -50%);
-      width: 60px;
-      height: 60px;
-      border-radius: 999px;
-      background: #0f172a;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: #18181b;
+      border: 2px solid #3f3f46;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #e5e7eb;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), 0 0 20px rgba(113, 113, 122, 0.1);
+      animation: glippy-pulse 3s ease-in-out infinite, glippy-scale-in 0.3s ease-out;
+    }
+
+    .glippy-radial-center-letter {
+      font-size: 48px;
       font-weight: 700;
-      pointer-events: auto;
-      cursor: pointer;
+      color: #fafafa;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1;
     }
-    .glean-radial-menu .item {
+
+    /* Action Buttons */
+    .glippy-radial-btn {
       position: absolute;
-      width: 52px;
-      height: 52px;
-      border-radius: 999px;
-      background: #111827;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.28);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #27272a 0%, #18181b 100%);
+      border: 1px solid rgba(63, 63, 70, 0.5);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #e5e7eb;
-      font-size: 12px;
-      pointer-events: auto;
       cursor: pointer;
-      transition: transform 120ms ease, background 120ms ease, color 120ms ease;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 10px rgba(113, 113, 122, 0.1);
+      backdrop-filter: blur(4px);
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
     }
-    .glean-radial-menu .item:hover {
-      background: #2563eb;
-      color: #fff;
-      transform: scale(1.06);
+
+    .glippy-radial-btn.visible {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
     }
-    .glean-radial-menu .label {
+
+    .glippy-radial-btn:hover {
+      background: linear-gradient(135deg, #3f3f46 0%, #27272a 100%);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(113, 113, 122, 0.3);
+      transform: translate(-50%, -50%) scale(1.1);
+      border-color: rgba(113, 113, 122, 0.5);
+    }
+
+    .glippy-radial-btn:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(113, 113, 122, 0.5), 0 12px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .glippy-radial-btn svg {
+      color: #fafafa;
+      transition: transform 0.3s ease;
+    }
+
+    .glippy-radial-btn:hover svg {
+      transform: scale(1.1);
+    }
+
+    /* Hover Label */
+    .glippy-radial-label {
       position: absolute;
-      top: 58px;
       left: 50%;
+      top: calc(50% + 130px);
       transform: translateX(-50%);
+      padding: 6px 12px;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      color: #fafafa;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       white-space: nowrap;
-      font-size: 11px;
-      color: #cbd5e1;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 10;
+    }
+
+    .glippy-radial-label.visible {
+      opacity: 1;
+    }
+
+    /* Tooltip */
+    .glippy-radial-tooltip {
+      position: absolute;
+      left: 50%;
+      top: calc(50% + 145px);
+      transform: translateX(-50%);
+      min-width: 280px;
+      padding: 10px 16px;
+      background: rgba(24, 24, 27, 0.95);
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+      text-align: center;
+      animation: glippy-fade-in 0.3s ease-out;
+    }
+
+    .glippy-radial-tooltip-text {
+      color: #a1a1aa;
+      font-size: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin-bottom: 6px;
+      white-space: nowrap;
+    }
+
+    .glippy-radial-tooltip-kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #27272a;
+      border-radius: 4px;
+      color: #fafafa;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 10px;
+      margin: 0 2px;
+    }
+
+    .glippy-radial-tooltip-dismiss {
+      color: #71717a;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      transition: color 0.2s ease;
+    }
+
+    .glippy-radial-tooltip-dismiss:hover {
+      color: #a1a1aa;
+    }
+
+    /* Backdrop */
+    .glippy-radial-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483646;
+    }
+
+    /* Animations */
+    @keyframes glippy-pulse {
+      0%, 100% { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), 0 0 20px rgba(113, 113, 122, 0.1); }
+      50% { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), 0 0 30px rgba(113, 113, 122, 0.2); }
+    }
+
+    @keyframes glippy-scale-in {
+      from { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+      to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+
+    @keyframes glippy-fade-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    /* Feedback Toast */
+    .glippy-feedback {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 2147483647;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: white;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      animation: glippy-slide-in 0.3s ease;
+    }
+
+    .glippy-feedback.success { background: #22c55e; }
+    .glippy-feedback.error { background: #ef4444; }
+
+    @keyframes glippy-slide-in {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes glippy-slide-out {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+
+    /* Dark mode support - menu is already dark, but ensure consistent rendering */
+    @media (prefers-color-scheme: light) {
+      .glippy-radial-center {
+        background: #18181b;
+      }
     }
   `;
   document.head.appendChild(style);
   radialStyleInjected = true;
+}
+
+// Calculate button position on the circle
+function getButtonPosition(angle) {
+  const radian = (angle * Math.PI) / 180;
+  return {
+    x: Math.cos(radian) * RADIUS,
+    y: Math.sin(radian) * RADIUS,
+  };
 }
 
 // Create radial menu
@@ -96,74 +308,225 @@ function createRadialMenu() {
   if (radialMenu) return radialMenu;
   ensureRadialStyles();
 
-  radialMenu = document.createElement('div');
-  radialMenu.className = 'glean-radial-menu';
-  radialMenu.innerHTML = `
-    <div class="center" data-action="clip">G</div>
-    ${[
-      { action: 'clip', icon: '📌', label: 'Clip' },
-      { action: 'copy', icon: '📋', label: 'Copy' },
-      { action: 'saveUrl', icon: '🔗', label: 'URL' },
-      { action: 'capture', icon: '📸', label: 'Page' },
-      { action: 'notebook', icon: '📓', label: 'Notebook' },
-      { action: 'close', icon: '✕', label: 'Close' },
-    ]
-      .map((item, idx) => {
-        const angle = (Math.PI * 2 * idx) / 6;
-        const radius = 80;
-        const x = 110 + Math.cos(angle) * radius - 26;
-        const y = 110 + Math.sin(angle) * radius - 26;
-        return `
-          <div class="item" data-action="${item.action}" style="left:${x}px; top:${y}px;">
-            <span>${item.icon}</span>
-            <div class="label">${item.label}</div>
-          </div>
-        `;
-      })
-      .join('')}
-  `;
+  // Backdrop for click-outside detection
+  const backdrop = document.createElement('div');
+  backdrop.className = 'glippy-radial-backdrop';
+  backdrop.addEventListener('click', hideRadialMenu);
 
-  radialMenu.addEventListener('click', (e) => {
-    const target = e.target.closest('[data-action]');
-    if (!target) return;
-    const action = target.getAttribute('data-action');
-    handleRadialAction(action);
+  // Main menu container
+  radialMenu = document.createElement('div');
+  radialMenu.className = 'glippy-radial-menu';
+
+  const inner = document.createElement('div');
+  inner.className = 'glippy-radial-inner';
+
+  // Center circle with "G"
+  const center = document.createElement('div');
+  center.className = 'glippy-radial-center';
+  center.innerHTML = '<span class="glippy-radial-center-letter">G</span>';
+  inner.appendChild(center);
+
+  // Hover label (hidden by default)
+  const label = document.createElement('div');
+  label.className = 'glippy-radial-label';
+  label.id = 'glippy-hover-label';
+  inner.appendChild(label);
+
+  // Action buttons
+  MENU_OPTIONS.forEach((option, index) => {
+    const pos = getButtonPosition(option.angle);
+    const btn = document.createElement('button');
+    btn.className = 'glippy-radial-btn';
+    btn.setAttribute('data-action', option.id);
+    btn.setAttribute('aria-label', option.label);
+    btn.setAttribute('title', option.label);
+    btn.innerHTML = option.icon;
+    btn.style.left = `calc(50% + ${pos.x}px)`;
+    btn.style.top = `calc(50% + ${pos.y}px)`;
+    btn.style.transitionDelay = `${index * 50}ms`;
+
+    // Hover events for label
+    btn.addEventListener('mouseenter', () => {
+      label.textContent = option.label;
+      label.classList.add('visible');
+    });
+    btn.addEventListener('mouseleave', () => {
+      label.classList.remove('visible');
+    });
+
+    // Click handler
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleRadialAction(option.id);
+    });
+
+    inner.appendChild(btn);
   });
 
-  document.body.appendChild(radialMenu);
+  // Tooltip (if not dismissed)
+  if (shouldShowTooltip()) {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'glippy-radial-tooltip';
+    tooltip.innerHTML = `
+      <p class="glippy-radial-tooltip-text">
+        Press <span class="glippy-radial-tooltip-kbd">Esc</span> or click anywhere to close
+      </p>
+      <button class="glippy-radial-tooltip-dismiss">Don't show again</button>
+    `;
+    tooltip.querySelector('.glippy-radial-tooltip-dismiss').addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissTooltip();
+    });
+    inner.appendChild(tooltip);
+  }
+
+  radialMenu.appendChild(inner);
+  radialMenu._backdrop = backdrop;
+
   return radialMenu;
 }
 
+// Handle actions
 function handleRadialAction(action) {
   switch (action) {
-    case 'clip':
-      handleClip();
+    case 'clip-text':
+      handleClipText();
       break;
-    case 'copy':
-      if (selectedText) navigator.clipboard.writeText(selectedText);
+    case 'clip-page':
+      handleClipPage();
       break;
-    case 'saveUrl':
-      safeRuntimeSendMessage({
-        action: 'saveClip',
-        data: {
-          url: window.location.href,
-          title: document.title || '',
-          selectedText: '',
-          domain: window.location.hostname,
-          timestamp: Date.now(),
-        },
-      });
+    case 'clip-url':
+      handleClipUrl();
       break;
-    case 'capture':
-      alert('Capture Page coming soon.');
-      break;
-    case 'notebook':
-      safeRuntimeSendMessage({ action: 'openNotebook' });
-      break;
-    default:
+    case 'search-glean':
+      handleSearchGlean();
       break;
   }
   hideRadialMenu();
+}
+
+// Clip selected text
+async function handleClipText() {
+  if (!selectedText) return;
+
+  const pageInfo = {
+    url: window.location.href,
+    title: document.title,
+    selectedText: cleanClipText(selectedText),
+    context: getTextContext(selectedElement),
+    timestamp: new Date().toISOString(),
+    domain: window.location.hostname,
+    favicon: getFavicon(),
+    type: 'text',
+  };
+
+  try {
+    if (!chrome.runtime?.id) {
+      throw new Error('Extension context invalidated');
+    }
+
+    await safeRuntimeSendMessage({ action: 'ping' });
+
+    const response = await safeRuntimeSendMessage({
+      action: 'saveClip',
+      data: pageInfo,
+    });
+
+    if (response?.success) {
+      showClipFeedback('Text clipped!');
+    } else {
+      throw new Error(response?.error || 'Failed to save clip');
+    }
+  } catch (error) {
+    console.error('Clip failed:', error);
+    showClipFeedback('Clip failed: ' + error.message, 'error');
+  }
+}
+
+// Clip full page
+async function handleClipPage() {
+  const pageInfo = {
+    url: window.location.href,
+    title: document.title,
+    selectedText: document.body.innerText.substring(0, 5000),
+    timestamp: new Date().toISOString(),
+    domain: window.location.hostname,
+    favicon: getFavicon(),
+    type: 'page',
+  };
+
+  try {
+    if (!chrome.runtime?.id) {
+      throw new Error('Extension context invalidated');
+    }
+
+    const response = await safeRuntimeSendMessage({
+      action: 'saveClip',
+      data: pageInfo,
+    });
+
+    if (response?.success) {
+      showClipFeedback('Page clipped!');
+    } else {
+      throw new Error(response?.error || 'Failed to save clip');
+    }
+  } catch (error) {
+    console.error('Clip failed:', error);
+    showClipFeedback('Clip failed: ' + error.message, 'error');
+  }
+}
+
+// Clip URL only
+async function handleClipUrl() {
+  const pageInfo = {
+    url: window.location.href,
+    title: document.title,
+    selectedText: '',
+    timestamp: new Date().toISOString(),
+    domain: window.location.hostname,
+    favicon: getFavicon(),
+    type: 'url',
+  };
+
+  try {
+    if (!chrome.runtime?.id) {
+      throw new Error('Extension context invalidated');
+    }
+
+    const response = await safeRuntimeSendMessage({
+      action: 'saveClip',
+      data: pageInfo,
+    });
+
+    if (response?.success) {
+      showClipFeedback('URL saved!');
+    } else {
+      throw new Error(response?.error || 'Failed to save URL');
+    }
+  } catch (error) {
+    console.error('Save URL failed:', error);
+    showClipFeedback('Save failed: ' + error.message, 'error');
+  }
+}
+
+// Search in Glean
+function handleSearchGlean() {
+  const searchText = selectedText || '';
+  if (!searchText) {
+    showClipFeedback('Select text to search', 'error');
+    return;
+  }
+
+  // Send message to open Glean search
+  safeRuntimeSendMessage({
+    action: 'searchGlean',
+    query: searchText,
+  }).then((response) => {
+    if (!response?.success) {
+      // Fallback: open Glean search directly (domain will need to be configured)
+      showClipFeedback('Configure Glean domain in settings', 'error');
+    }
+  });
 }
 
 // Show radial menu near selection
@@ -172,46 +535,78 @@ function showRadialMenu(selection) {
   const range = selection.getRangeAt(0);
   const rect = range.getBoundingClientRect();
 
-  menu.style.display = 'block';
-  menu.style.left = `${rect.left + window.scrollX - 70}px`;
-  menu.style.top = `${rect.top + window.scrollY - 70}px`;
+  // Position menu centered on selection
+  const x = rect.left + rect.width / 2 + window.scrollX;
+  const y = rect.top + rect.height / 2 + window.scrollY;
+
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+  menu.style.transform = 'translate(-50%, -50%)';
 
   selectedText = selection.toString().trim();
   selectedElement = range.commonAncestorContainer;
+
+  // Add backdrop and menu to DOM
+  if (!menu._backdrop.parentNode) {
+    document.body.appendChild(menu._backdrop);
+  }
+  if (!menu.parentNode) {
+    document.body.appendChild(menu);
+  }
+
+  // Animate buttons in
+  requestAnimationFrame(() => {
+    menu.querySelectorAll('.glippy-radial-btn').forEach((btn) => {
+      btn.classList.add('visible');
+    });
+  });
 }
 
 // Hide radial menu
 function hideRadialMenu() {
   if (radialMenu) {
-    radialMenu.style.display = 'none';
+    radialMenu.querySelectorAll('.glippy-radial-btn').forEach((btn) => {
+      btn.classList.remove('visible');
+    });
+    setTimeout(() => {
+      if (radialMenu.parentNode) {
+        radialMenu.parentNode.removeChild(radialMenu);
+      }
+      if (radialMenu._backdrop?.parentNode) {
+        radialMenu._backdrop.parentNode.removeChild(radialMenu._backdrop);
+      }
+    }, 150);
   }
 }
 
 // Handle text selection
-document.addEventListener('mouseup', e => {
+document.addEventListener('mouseup', (e) => {
+  // Ignore if clicking inside the menu
+  if (radialMenu?.contains(e.target)) return;
+
   setTimeout(() => {
     const selection = window.getSelection();
-    if (selection.rangeCount > 0 && selection.toString().trim()) {
+    if (selection.rangeCount > 0 && selection.toString().trim().length > 0) {
       showRadialMenu(selection);
-    } else {
-      hideRadialMenu();
     }
   }, 10);
 });
 
-// Hide when clicking elsewhere
-document.addEventListener('mousedown', e => {
-  if (!radialMenu?.contains(e.target)) {
+// Hide on escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && radialMenu?.parentNode) {
     hideRadialMenu();
   }
 });
 
+// Hide when clicking elsewhere (handled by backdrop)
+
 // Get favicon URL
 function getFavicon() {
-  // Try to find favicon link
-  const faviconLink = document.querySelector('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
-  if (faviconLink && faviconLink.href) {
-    // If relative URL, make it absolute
+  const faviconLink = document.querySelector(
+    'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'
+  );
+  if (faviconLink?.href) {
     if (faviconLink.href.startsWith('/')) {
       return window.location.origin + faviconLink.href;
     }
@@ -220,164 +615,29 @@ function getFavicon() {
     }
     return faviconLink.href;
   }
-  // Fallback to Google favicon service
   return `https://www.google.com/s2/favicons?domain=${window.location.hostname}&sz=16`;
 }
 
-// Clean up clip text - get first few lines or just heading
+// Clean up clip text
 function cleanClipText(text) {
   if (!text) return '';
-  
-  // Remove image URLs and other messy content
-  const lines = text.split('\n').filter(line => {
+
+  const lines = text.split('\n').filter((line) => {
     const trimmed = line.trim();
-    // Remove lines that are just URLs
     if (trimmed.match(/^https?:\/\//)) return false;
-    // Remove lines that are just image URLs with parameters
     if (trimmed.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) return false;
-    // Remove lines that are just metadata like "Images:", "Clipped:", etc.
     if (trimmed.match(/^(Images?|Clipped?|Source?|Domain?):/i)) return false;
-    // Remove very long lines (likely URLs or encoded data)
     if (trimmed.length > 200) return false;
     return true;
   });
-  
-  // Get first 3-5 meaningful lines
-  const meaningfulLines = lines.filter(l => l.trim().length > 10).slice(0, 5);
-  
+
+  const meaningfulLines = lines.filter((l) => l.trim().length > 10).slice(0, 5);
+
   if (meaningfulLines.length === 0) {
-    // If no meaningful lines, just return first 200 chars
     return text.substring(0, 200).trim();
   }
-  
+
   return meaningfulLines.join('\n').substring(0, 500).trim();
-}
-
-// Handle clip action
-async function handleClip() {
-  if (!selectedText) {return;}
-
-  // Get favicon
-  const favicon = getFavicon();
-  
-  // Clean up selected text
-  const cleanedText = cleanClipText(selectedText);
-
-  const pageInfo = {
-    url: window.location.href,
-    title: document.title,
-    selectedText: cleanedText,
-    context: getTextContext(selectedElement),
-    timestamp: new Date().toISOString(),
-    domain: window.location.hostname,
-    favicon: favicon,
-    // Don't include images array - it creates messy content
-  };
-
-  try {
-    // Check if extension context is still valid
-    if (!chrome.runtime?.id) {
-      throw new Error('Extension context invalidated');
-    }
-
-    // First, try to ping the service worker to wake it up
-    await safeRuntimeSendMessage({ action: 'ping' });
-
-    // Add retry mechanism for inactive service worker
-    let retryCount = 0;
-    const maxRetries = 3;
-
-    while (retryCount < maxRetries) {
-      try {
-        // Save to extension storage
-        const response = await safeRuntimeSendMessage({
-          action: 'saveClip',
-          data: pageInfo,
-        });
-
-        if (response && response.success) {
-          // Show success feedback
-          showClipFeedback('Clipped to Glean!');
-          hideClipButton();
-          return; // Success, exit the function
-        } else if (response && response.error) {
-          throw new Error(response.error);
-        } else {
-          throw new Error('Unknown response from extension');
-        }
-      } catch (msgError) {
-        retryCount++;
-        console.log(`Retry ${retryCount}/${maxRetries}:`, msgError.message);
-
-        if (retryCount >= maxRetries) {
-          throw msgError; // Final attempt failed
-        }
-
-        // Wait progressively longer between retries
-        await new Promise(resolve => setTimeout(resolve, retryCount * 200));
-      }
-    }
-  } catch (error) {
-    console.error('Clip failed after retries:', error);
-    if (error.message.includes('Extension context invalidated')) {
-      showClipFeedback('Extension context lost - reload the page and extension', 'error');
-    } else if (error.message.includes('receiving end does not exist')) {
-      showClipFeedback('Service worker inactive - try clipping again', 'error');
-    } else if (error.message.includes('service worker')) {
-      showClipFeedback('Extension service unavailable - please reload extension', 'error');
-    } else if (error.message.includes('Could not establish connection')) {
-      showClipFeedback('Extension connection failed - reload page and try again', 'error');
-    } else {
-      showClipFeedback('Clip failed: ' + error.message, 'error');
-    }
-  }
-}
-
-// Scrape images from the current page
-function scrapePageImages() {
-  const images = [];
-
-  // Look for various image sources
-  const selectors = [
-    'img[src]', // Regular images
-    '[data-src]', // Lazy loaded images
-    '.hero-image img', // Hero images
-    'article img', // Article images
-    '.content img', // Content images
-    '.featured-image img', // Featured images
-    'meta[property="og:image"]', // Open Graph images
-    'meta[name="twitter:image"]', // Twitter card images
-  ];
-
-  selectors.forEach(selector => {
-    const elements = document.querySelectorAll(selector);
-    elements.forEach(el => {
-      let src = el.src || el.getAttribute('data-src') || el.content;
-      if (src) {
-        // Convert relative URLs to absolute
-        if (src.startsWith('/')) {
-          src = window.location.origin + src;
-        } else if (!src.startsWith('http')) {
-          src = new URL(src, window.location.href).href;
-        }
-
-        // Filter out small/icon images and duplicates
-        if (
-          (!images.includes(src) &&
-            !src.includes('icon') &&
-            !src.includes('logo') &&
-            !src.includes('avatar') &&
-            !src.match(/\d+x\d+/)) ||
-          (src.match(/\d+x(\d+)/) && parseInt(RegExp.$1) > 200)
-        ) {
-          images.push(src);
-        }
-      }
-    });
-  });
-
-  // Limit to first 5 images to avoid bloat
-  return images.slice(0, 5);
 }
 
 // Get surrounding text context
@@ -387,61 +647,29 @@ function getTextContext(element, maxLength = 200) {
     contextElement = contextElement.parentNode;
   }
 
-  if (!contextElement) {return '';}
+  if (!contextElement) return '';
 
   const fullText = contextElement.textContent || '';
-  if (fullText.length <= maxLength) {return fullText;}
+  if (fullText.length <= maxLength) return fullText;
 
-  // Find selected text position and get context around it
   const selectedIndex = fullText.indexOf(selectedText);
-  if (selectedIndex === -1) {return fullText.substring(0, maxLength);}
+  if (selectedIndex === -1) return fullText.substring(0, maxLength);
 
   const start = Math.max(0, selectedIndex - maxLength / 2);
   const end = Math.min(fullText.length, start + maxLength);
 
-  return (
-    (start > 0 ? '...' : '') + fullText.substring(start, end) + (end < fullText.length ? '...' : '')
-  );
+  return (start > 0 ? '...' : '') + fullText.substring(start, end) + (end < fullText.length ? '...' : '');
 }
 
 // Show feedback message
 function showClipFeedback(message, type = 'success') {
   const feedback = document.createElement('div');
-  feedback.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 10001;
-    background: ${type === 'error' ? '#EF4444' : '#10B981'};
-    color: white;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    animation: slideIn 0.3s ease;
-  `;
-
+  feedback.className = `glippy-feedback ${type}`;
   feedback.textContent = message;
   document.body.appendChild(feedback);
 
   setTimeout(() => {
-    feedback.style.animation = 'slideOut 0.3s ease forwards';
+    feedback.style.animation = 'glippy-slide-out 0.3s ease forwards';
     setTimeout(() => feedback.remove(), 300);
   }, 2000);
 }
-
-// Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-  }
-  @keyframes slideOut {
-    from { transform: translateX(0); opacity: 1; }
-    to { transform: translateX(100%); opacity: 0; }
-  }
-`;
-document.head.appendChild(style);

@@ -278,6 +278,13 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         .catch(error => sendResponse({ success: false, connected: false, error: error.message }));
       return true;
 
+    case 'searchGlean':
+      // Open Glean search with the query text
+      handleSearchGlean(request.query)
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
+
     case 'executeCommand':
       // Handle commands from command palette
       handleCommandPaletteAction(request.commandId)
@@ -387,6 +394,33 @@ async function handleCommandPaletteAction(commandId) {
     default:
       console.debug('Unknown command:', commandId);
       return { success: false, error: 'Unknown command' };
+  }
+}
+
+/**
+ * Handles opening Glean search with a query
+ * @param {string} query - The search query text
+ * @returns {Promise<Object>} - Result object
+ */
+async function handleSearchGlean(query) {
+  try {
+    const config = await getGleanConfig();
+
+    if (!config?.domain) {
+      return { success: false, error: 'Glean domain not configured' };
+    }
+
+    // Build Glean search URL
+    const searchQuery = encodeURIComponent(query || '');
+    const searchUrl = `https://${config.domain}/search?q=${searchQuery}`;
+
+    // Open in new tab
+    await chrome.tabs.create({ url: searchUrl });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening Glean search:', error);
+    return { success: false, error: error.message };
   }
 }
 

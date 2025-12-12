@@ -1,0 +1,127 @@
+# Glippy Project Rules for Cursor
+
+## Strict Rules
+
+### NO EMOJIS
+- **NEVER use emojis in code, documentation, comments, or UI**
+- No emoji in commit messages, issue templates, or user-facing text
+- Use text labels or icons instead
+
+### Versioning
+- Use Semantic Versioning (MAJOR.MINOR.PATCH)
+- Update `manifest.json` version for every release
+- Update `CHANGELOG.md` with every significant change
+- Pre-release versions start at 0.x.x
+- Version 1.0.0 = Chrome Web Store public release
+
+## Design System
+
+### UI Framework
+- **Component Library**: shadcn/ui components only
+- **Styling**: Tailwind CSS v4
+- **Color Palette**: Zinc-based theme (zinc-50 to zinc-950)
+- **Design Tool**: All new UI designs MUST be created with v0.app first
+
+### Icons
+- **Icon Library**: lucide-react ONLY - no mixing icon libraries
+- **Icon Size**: Use consistent sizing (h-4 w-4 for inline, h-5 w-5 for buttons)
+- **Icon Colors**: Use text color utilities that match theme (text-zinc-400, text-zinc-600, etc.)
+
+### Theme Support
+- All components MUST support light and dark themes
+- Use `dark:` Tailwind variants for dark mode styles
+- Background: `bg-white dark:bg-zinc-950`
+- Text: `text-zinc-900 dark:text-zinc-100`
+- Borders: `border-zinc-200 dark:border-zinc-800`
+- Muted text: `text-zinc-500 dark:text-zinc-400`
+
+### v0.app Design Process
+1. Create new UI designs in v0 first
+2. Use the v0 MCP tools: `mcp__v0__createChat`, `mcp__v0__findChats`
+3. Ensure designs match existing zinc color palette
+4. Export and adapt to project's component structure
+
+## Code Standards
+
+### React/Next.js
+- Use `'use client'` directive for client components
+- Prefer functional components with hooks
+- Use TypeScript for all new files
+- Follow Next.js 15 App Router conventions
+
+### Chrome Extension Compatibility
+- Use `<a href>` instead of Next.js `Link` component
+- All API calls go through `chrome.runtime.sendMessage`
+- Test in chrome-extension:// context, not localhost
+
+### State Management
+- Use React Context for shared state (SidebarContext, ThemeContext)
+- Persist preferences to localStorage
+- Use chrome.storage.local for extension data
+
+## Security Rules
+
+### API Keys & Secrets
+- NEVER commit API keys, tokens, or secrets to git
+- Use `.env.local` or `.env.test.local` for local development
+- All `.env*` files are gitignored (except templates)
+- Chrome storage for runtime token storage only
+
+### GitHub
+- Never expose Glean API tokens in commits
+- Use pre-filled URL patterns for issue creation (not automated API)
+- Review diffs before committing for accidental secrets
+
+## File Organization
+
+### Component Structure
+```
+src/components/
+├── ui/           # shadcn/ui base components
+├── sidebar/      # Sidebar-specific components
+├── [Feature].tsx # Feature components (FeedbackModal, etc.)
+```
+
+### Naming Conventions
+- Components: PascalCase (FeedbackModal.tsx)
+- Utilities: camelCase (clips-service.ts)
+- Types: PascalCase interfaces, camelCase type aliases
+
+## Testing
+- Playwright for E2E tests
+- Test files in `tests/` directory with `.spec.cjs` extension
+- Run `npm run test:playwright` before commits
+
+## Chrome Web Store Compliance
+
+### Required for Approval
+- No `eval()` or `Function()` constructors
+- No external script loading (all code bundled)
+- Justified permissions only (document why each is needed)
+- Privacy policy hosted at public URL
+- Single clear purpose stated in description
+- HTTPS only (no HTTP in host_permissions)
+
+### Permissions Justification
+Each permission in manifest.json must be justified:
+- `activeTab` - Access current tab for clipping content
+- `storage` - Store clips and user preferences locally
+- `contextMenus` - Right-click menu for quick actions
+- `scripting` - Inject content scripts for clipping
+- `identity` - OAuth authentication with Glean (optional)
+
+### Before Submission
+- Run `./build-extension.sh` for production build
+- Test on clean Chrome profile
+- Verify no console errors
+- Take screenshots (1280x800)
+- Package with `./package-extension.sh`
+
+See `docs/chrome-store/PRE_SUBMISSION_CHECKLIST.md` for full checklist.
+
+## Key v0 Designs Reference
+Track v0 chat IDs for major UI components here:
+- Command palette: h0pN3O1OOxs
+- Radial command menu: sx4ShmZsSTm
+- Feedback modal: (created Dec 2024)
+- Dashboard layout: (created Dec 2024)
