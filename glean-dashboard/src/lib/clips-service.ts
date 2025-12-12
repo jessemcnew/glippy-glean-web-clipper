@@ -17,73 +17,15 @@ export interface Clip {
   syncStatus?: 'synced' | 'pending' | 'failed'
   collectionId?: string
   collectionName?: string
+  tags?: string[]
 }
 
 /**
- * Fetches clips from the extension via messaging API
- * Falls back to localStorage for development/testing
- */
-/**
- * Gets the extension ID from the manifest or environment
- * The dashboard needs to know the extension ID to communicate with it
- */
-function getExtensionId(): string | undefined {
-  // In a real scenario, you'd configure this or get it from environment
-  // For now, we'll try to detect it or use a fallback
-  if (typeof chrome !== 'undefined' && chrome.runtime) {
-    // If we're in an extension context, use the current extension ID
-    if (chrome.runtime.id) {
-      return chrome.runtime.id
-    }
-  }
-  // Could also check localStorage for a configured extension ID
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem('glean_extension_id')
-    if (stored) return stored
-  }
-  return undefined
-}
-
-/**
- * Fetches clips from the extension via messaging API
- * Falls back to localStorage for development/testing
+ * Fetches clips from localStorage
+ * The extension stores clips in localStorage, which the dashboard can read directly
  */
 export async function fetchClips(): Promise<Clip[]> {
   try {
-    // Try to communicate with extension via chrome.runtime.sendMessage
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-      try {
-        const extensionId = getExtensionId()
-        
-        return new Promise((resolve) => {
-          // Try to get clips from extension
-          // If extensionId is undefined, chrome will try to message the extension that loaded this page
-          chrome.runtime.sendMessage(
-            extensionId,
-            { action: 'getClips' },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                // Extension not available or not installed
-                console.warn('Extension not available, using localStorage fallback:', chrome.runtime.lastError.message)
-                resolve(getClipsFromLocalStorage())
-                return
-              }
-              if (response && response.success && response.clips) {
-                resolve(normalizeClips(response.clips))
-              } else {
-                // No clips or error response
-                resolve(getClipsFromLocalStorage())
-              }
-            }
-          )
-        })
-      } catch (error) {
-        console.warn('Failed to communicate with extension:', error)
-        return getClipsFromLocalStorage()
-      }
-    }
-
-    // Fallback to localStorage for development
     return getClipsFromLocalStorage()
   } catch (error) {
     console.error('Failed to fetch clips:', error)
@@ -97,13 +39,92 @@ export async function fetchClips(): Promise<Clip[]> {
 function getClipsFromLocalStorage(): Clip[] {
   try {
     const stored = localStorage.getItem('glean_clips')
-    if (!stored) return []
+    if (!stored) {
+      // Return mock data for development/demo
+      return getMockClips()
+    }
     const clips = JSON.parse(stored)
+    if (clips.length === 0) {
+      return getMockClips()
+    }
     return normalizeClips(clips)
   } catch (error) {
     console.error('Failed to parse clips from localStorage:', error)
-    return []
+    return getMockClips()
   }
+}
+
+/**
+ * Returns mock clips for development/demo purposes
+ */
+function getMockClips(): Clip[] {
+  return [
+    {
+      id: 'mock-1',
+      type: 'text',
+      url: 'https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering',
+      title: 'Prompt Engineering Guide - Anthropic',
+      date: '2024-12-10',
+      source: 'docs.anthropic.com',
+      selectedText: 'Claude performs best with clear, specific instructions. Break complex tasks into steps and provide examples of desired output format.',
+      domain: 'docs.anthropic.com',
+      timestamp: Date.now() - 86400000,
+      syncStatus: 'synced',
+      collectionName: 'AI Resources'
+    },
+    {
+      id: 'mock-2',
+      type: 'text',
+      url: 'https://react.dev/learn/thinking-in-react',
+      title: 'Thinking in React',
+      date: '2024-12-09',
+      source: 'react.dev',
+      selectedText: 'React changes how you think about designs and apps. When you build a UI with React, you first break it apart into pieces called components.',
+      domain: 'react.dev',
+      timestamp: Date.now() - 172800000,
+      syncStatus: 'synced',
+      collectionName: 'Dev Docs'
+    },
+    {
+      id: 'mock-3',
+      type: 'text',
+      url: 'https://www.glean.com/blog/enterprise-search',
+      title: 'The Future of Enterprise Search',
+      date: '2024-12-08',
+      source: 'glean.com',
+      selectedText: 'Enterprise search has evolved beyond keyword matching. Modern solutions use AI to understand context, user intent, and organizational knowledge graphs.',
+      domain: 'glean.com',
+      timestamp: Date.now() - 259200000,
+      syncStatus: 'pending',
+      collectionName: undefined
+    },
+    {
+      id: 'mock-4',
+      type: 'text',
+      url: 'https://tailwindcss.com/docs/customizing-colors',
+      title: 'Customizing Colors - Tailwind CSS',
+      date: '2024-12-07',
+      source: 'tailwindcss.com',
+      selectedText: 'Tailwind includes an expertly-crafted default color palette out-of-the-box that is a great starting point.',
+      domain: 'tailwindcss.com',
+      timestamp: Date.now() - 345600000,
+      syncStatus: 'synced',
+      collectionName: 'CSS'
+    },
+    {
+      id: 'mock-5',
+      type: 'text',
+      url: 'https://developer.chrome.com/docs/extensions',
+      title: 'Chrome Extensions Documentation',
+      date: '2024-12-06',
+      source: 'developer.chrome.com',
+      selectedText: 'Extensions are small software programs that customize the browsing experience. They let users tailor Chrome functionality to individual needs.',
+      domain: 'developer.chrome.com',
+      timestamp: Date.now() - 432000000,
+      syncStatus: 'synced',
+      collectionName: 'Extension Dev'
+    }
+  ]
 }
 
 /**
@@ -135,40 +156,10 @@ function formatDate(timestamp: number | string): string {
 }
 
 /**
- * Deletes a clip by ID
+ * Deletes a clip by ID from localStorage
  */
 export async function deleteClip(clipId: string | number): Promise<boolean> {
   try {
-    // Try to communicate with extension via chrome.runtime.sendMessage
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-      try {
-        const extensionId = getExtensionId()
-        
-        return new Promise((resolve) => {
-          chrome.runtime.sendMessage(
-            extensionId,
-            { action: 'deleteClip', clipId },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                console.warn('Extension not available, using localStorage fallback:', chrome.runtime.lastError.message)
-                resolve(deleteClipFromLocalStorage(clipId))
-                return
-              }
-              if (response && response.success !== undefined) {
-                resolve(response.success)
-              } else {
-                resolve(deleteClipFromLocalStorage(clipId))
-              }
-            }
-          )
-        })
-      } catch (error) {
-        console.warn('Failed to communicate with extension:', error)
-        return deleteClipFromLocalStorage(clipId)
-      }
-    }
-
-    // Fallback to localStorage
     return deleteClipFromLocalStorage(clipId)
   } catch (error) {
     console.error('Failed to delete clip:', error)

@@ -208,11 +208,123 @@ function normalizeDomain(domain) {
   return `https://${cleanDomain}`;
 }
 
+/**
+ * Performs a fetch request using browser cookies for authentication
+ * This piggybacks on the user's existing Glean session (Okta SSO cookies)
+ * No API token required - uses the same auth as the Glean web app
+ * 
+ * @param {string} url - The full URL to fetch
+ * @param {Object} options - Fetch options (method, headers, body, etc.)
+ * @param {Object} config - Configuration object
+ * @returns {Promise<Object>} Parsed JSON response
+ */
+async function fetchWithCookies(url, options = {}, config = {}) {
+  const { timeout = 30000 } = config;
+
+  // Create abort controller for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include', // Include cookies in request
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers,
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    const responseText = await response.text();
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = responseText ? JSON.parse(responseText) : {};
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch (e) {
+        if (responseText) {
+          errorMessage = responseText.substring(0, 200);
+        }
+      }
+
+      const error = new Error(errorMessage);
+      error.status = response.status;
+      error.responseText = responseText;
+      throw error;
+    }
+
+    if (!responseText || responseText.trim() === '') {
+      return {};
+    }
+
+    return JSON.parse(responseText);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeout}ms`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Tests cookie-based authentication by calling listcollections
+ * User must be logged into Glean in their browser for this to work
+ * @param {string} domain - Glean domain (will be normalized to backend format)
+ * @returns {Promise<Object>} Test result with success status and collections
+ */
+async function testCookieAuth(domain = 'linkedin-be.glean.com') {
+  const baseUrl = normalizeDomain(domain);
+  const testUrl = `${baseUrl}/rest/api/v1/listcollections`;
+
+  console.log('Testing cookie-based auth to:', testUrl);
+
+  try {
+    const result = await fetchWithCookies(testUrl, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+
+    const collectionsCount = result.collections?.length || 0;
+    console.log('Cookie auth SUCCESS! Found', collectionsCount, 'collections');
+
+    return {
+      success: true,
+      message: `Cookie auth works! Found ${collectionsCount} collections.`,
+      collectionsCount,
+      collections: result.collections || [],
+    };
+  } catch (error) {
+    console.error('Cookie auth FAILED:', error);
+
+    if (error.status === 401 || error.status === 403) {
+      return {
+        success: false,
+        error: 'Not authenticated. Make sure you are logged into Glean in your browser.',
+        status: error.status,
+      };
+    }
+
+    return {
+      success: false,
+      error: error.message,
+      status: error.status,
+    };
+  }
+}
+
 export {
   fetchWithRetry,
   fetchJSON,
+  fetchWithCookies,
   createCollectionsAPIHeaders,
   createIndexingAPIHeaders,
   normalizeDomain,
+  testCookieAuth,
 };
 

@@ -18,6 +18,7 @@ import {
   runGleanAgent,
   findSimilarArticles,
 } from './modules/gleanApi.js';
+import { testCookieAuth } from './modules/apiFetch.js';
 import {
   initiateSlackOAuth,
   exchangeSlackToken,
@@ -89,6 +90,12 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true;
 
+    case 'testCookieAuth':
+      testCookieAuth(request.domain || 'linkedin-be.glean.com')
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
+
     case 'fetchCollections':
       fetchGleanCollections()
         .then(result => {
@@ -132,34 +139,55 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       return true;
 
     case 'getOAuthToken':
-      // Share OAuth token with dashboard/web pages
+    case 'getAuthConfig':
+      // Share auth config with dashboard/web pages
+      // Works with both OAuth and manual API tokens
       (async () => {
         try {
-          const { getOrRefreshOAuthToken } = await import('./modules/oauth.js');
           const config = await getGleanConfig();
-          if (config?.authMethod === 'oauth' && config?.apiToken) {
-            // Return existing OAuth token
-            sendResponse({ 
-              success: true, 
+
+          // If we have a configured token (any auth method), return it
+          if (config?.apiToken && config?.domain) {
+            sendResponse({
+              success: true,
               token: config.apiToken,
               domain: config.domain,
-              authMethod: 'oauth'
+              authMethod: config.authMethod || 'manual',
             });
+            return;
+          }
+
+          // No token configured - check if OAuth is possible
+          if (config?.authMethod === 'oauth' || !config?.apiToken) {
+            try {
+              const { getOrRefreshOAuthToken } = await import('./modules/oauth.js');
+              const token = await getOrRefreshOAuthToken(config || { domain: 'app.glean.com' });
+              sendResponse({
+                success: true,
+                token,
+                domain: config?.domain || 'app.glean.com',
+                authMethod: 'oauth',
+              });
+            } catch (oauthError) {
+              // OAuth failed or not available
+              sendResponse({
+                success: false,
+                error: 'Not authenticated. Please configure your API token in the extension popup.',
+                requiresSetup: true,
+              });
+            }
           } else {
-            // Try to get OAuth token (will prompt user if needed)
-            const token = await getOrRefreshOAuthToken(config || { domain: 'app.glean.com' });
-            sendResponse({ 
-              success: true, 
-              token,
-              domain: config?.domain || 'app.glean.com',
-              authMethod: 'oauth'
+            sendResponse({
+              success: false,
+              error: 'Not authenticated. Please configure your API token in the extension popup.',
+              requiresSetup: true,
             });
           }
         } catch (error) {
-          sendResponse({ 
-            success: false, 
+          sendResponse({
+            success: false,
             error: error.message,
-            requiresSetup: error.message.includes('not configured')
+            requiresSetup: error.message.includes('not configured'),
           });
         }
       })();
@@ -250,6 +278,13 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         .catch(error => sendResponse({ success: false, connected: false, error: error.message }));
       return true;
 
+    case 'executeCommand':
+      // Handle commands from command palette
+      handleCommandPaletteAction(request.commandId)
+        .then(result => sendResponse(result))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
+
     default:
       // Ignore messages without action (like PING which uses 'type')
       if (request.action === undefined && request.type !== undefined) {
@@ -305,6 +340,53 @@ async function handleAddToCollection(collectionId, clip) {
   } catch (error) {
     console.error(`Error adding clip to collection ${collectionId}:`, error);
     throw error; // Re-throw to be caught by the message listener
+  }
+}
+
+/**
+ * Handles command palette actions
+ * Opens appropriate pages based on the command ID
+ * @param {string} commandId - The command to execute
+ * @returns {Promise<Object>} - Result object
+ */
+async function handleCommandPaletteAction(commandId) {
+  console.log('Executing command palette action:', commandId);
+
+  // Dashboard URLs (bundled into extension)
+  const DASHBOARD_BASE = chrome.runtime.getURL('dashboard');
+  const dashboardUrl = `${DASHBOARD_BASE}/index.html`;
+  const libraryUrl = `${DASHBOARD_BASE}/library/index.html`;
+  const promptsUrl = `${DASHBOARD_BASE}/prompts/index.html`;
+
+  switch (commandId) {
+    case 'recent-clips':
+      await chrome.tabs.create({ url: dashboardUrl });
+      return { success: true };
+
+    case 'library':
+      await chrome.tabs.create({ url: libraryUrl });
+      return { success: true };
+
+    case 'prompts':
+      await chrome.tabs.create({ url: promptsUrl });
+      return { success: true };
+
+    case 'preferences':
+    case 'configuration':
+      // These should open the popup - but we can't programmatically open popup
+      // Instead, show a notification or open a settings page
+      console.log('Settings commands should be handled in popup');
+      return { success: true, message: 'Click extension icon to access settings' };
+
+    case 'capture-area':
+    case 'capture-visible':
+    case 'capture-full-page':
+      // Screenshot capture - not yet implemented
+      return { success: false, message: 'Capture actions coming soon' };
+
+    default:
+      console.debug('Unknown command:', commandId);
+      return { success: false, error: 'Unknown command' };
   }
 }
 

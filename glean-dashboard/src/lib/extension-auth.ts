@@ -11,23 +11,36 @@ export interface ExtensionAuthResponse {
 }
 
 /**
- * Gets the extension ID from localStorage or tries to detect it
+ * Check if we're running inside the Chrome extension context
+ * (i.e., loaded from chrome-extension:// protocol)
  */
-function getExtensionId(): string | undefined {
-  if (typeof window === 'undefined') return undefined
-  
-  // Check if extension ID is stored
-  const stored = localStorage.getItem('glean_extension_id')
-  if (stored) return stored
-  
-  // Try to detect extension by attempting to send a message
-  // Chrome will use the extension that can receive messages
-  return undefined // Let chrome.runtime.sendMessage handle it
+export function isRunningInExtension(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.location.protocol === 'chrome-extension:'
 }
 
 /**
- * Requests OAuth token from the Chrome extension
- * Returns the token if extension is installed and has OAuth configured
+ * Gets the extension ID from localStorage or from the current context
+ */
+function getExtensionId(): string | undefined {
+  if (typeof window === 'undefined') return undefined
+
+  // If running inside extension, get ID from runtime
+  if (isRunningInExtension() && typeof chrome !== 'undefined' && chrome.runtime?.id) {
+    return chrome.runtime.id
+  }
+
+  // Check if extension ID is stored (for external web pages)
+  const stored = localStorage.getItem('glean_extension_id')
+  if (stored) return stored
+
+  // No extension ID available
+  return undefined
+}
+
+/**
+ * Requests auth config from the Chrome extension
+ * Returns the token if extension is installed and has auth configured
  */
 export async function getOAuthTokenFromExtension(): Promise<ExtensionAuthResponse> {
   if (typeof window === 'undefined' || typeof chrome === 'undefined' || !chrome.runtime) {
@@ -38,49 +51,70 @@ export async function getOAuthTokenFromExtension(): Promise<ExtensionAuthRespons
   }
 
   try {
+    const runtime = chrome.runtime
+    const inExtension = isRunningInExtension()
     const extensionId = getExtensionId()
-    
-    return new Promise((resolve) => {
-      // chrome.runtime.sendMessage requires extensionId to be a string or omitted
-      // If undefined, Chrome will try to message extensions that can receive messages
-      const messageOptions: any = { action: 'getOAuthToken' }
-      
-      if (extensionId) {
-        chrome.runtime.sendMessage(extensionId, messageOptions, (response) => {
-          handleResponse(response, resolve)
-        })
-      } else {
-        // Try without extensionId - Chrome will message any extension that can receive it
-        chrome.runtime.sendMessage(messageOptions, (response) => {
-          handleResponse(response, resolve)
-        })
+
+    // If not in extension and no extension ID, we can't communicate
+    if (!inExtension && !extensionId) {
+      return {
+        success: false,
+        error: 'Extension ID not available',
+        requiresSetup: true,
       }
-      
-      function handleResponse(response: any, resolveFn: (value: ExtensionAuthResponse) => void) {
-        if (chrome.runtime?.lastError) {
-          resolveFn({
+    }
+
+    return new Promise((resolve) => {
+      const message = { action: 'getOAuthToken' }
+
+      // Add timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        resolve({
+          success: false,
+          error: 'Extension communication timeout',
+          requiresSetup: false,
+        })
+      }, 5000)
+
+      const handleResponse = (response: unknown) => {
+        clearTimeout(timeout)
+
+        if (runtime.lastError) {
+          resolve({
             success: false,
-            error: chrome.runtime.lastError.message,
-            requiresSetup: chrome.runtime.lastError.message.includes('not found') || 
-                           chrome.runtime.lastError.message.includes('Could not establish'),
+            error: runtime.lastError.message || 'Extension communication error',
+            requiresSetup:
+              runtime.lastError.message?.includes('not found') ||
+              runtime.lastError.message?.includes('Could not establish'),
           })
           return
         }
-        
-        if (response && response.success) {
-          resolveFn({
+
+        const resp = response as Record<string, unknown> | undefined
+        if (resp && resp.success) {
+          resolve({
             success: true,
-            token: response.token,
-            domain: response.domain,
-            authMethod: response.authMethod || 'oauth',
+            token: resp.token as string,
+            domain: resp.domain as string,
+            authMethod: (resp.authMethod as 'oauth' | 'manual') || 'manual',
           })
         } else {
-          resolveFn({
+          resolve({
             success: false,
-            error: response?.error || 'Failed to get OAuth token from extension',
-            requiresSetup: response?.requiresSetup,
+            error: (resp?.error as string) || 'Failed to get token from extension',
+            requiresSetup: resp?.requiresSetup as boolean,
           })
         }
+      }
+
+      // When running inside the extension, don't pass extension ID
+      // When running in external page, must pass extension ID
+      if (inExtension) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(runtime.sendMessage as any)(message, handleResponse)
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(runtime.sendMessage as any)(extensionId!, message, handleResponse)
       }
     })
   } catch (error) {
@@ -93,35 +127,51 @@ export async function getOAuthTokenFromExtension(): Promise<ExtensionAuthRespons
 
 /**
  * Checks if the extension is installed and available
- * Note: Web pages need the extension ID to communicate with extensions
- * For now, we'll return false and let users use manual entry or web OAuth
+ * Works in two contexts:
+ * 1. Inside extension (chrome-extension:// protocol) - always available
+ * 2. External web pages - requires extension ID and externally_connectable
  */
 export async function checkExtensionAvailable(): Promise<boolean> {
-  if (typeof window === 'undefined' || typeof chrome === 'undefined' || !chrome.runtime) {
+  if (typeof window === 'undefined') {
     return false
   }
 
-  // For web pages to message extensions, we need the extension ID
-  // Since we don't have it configured, return false quickly
-  // Extension integration can be added later when extension ID is known
-  return false
-  
-  // Future: If extension ID is configured, use this:
-  /*
+  // If running inside the extension context, it's always available
+  if (isRunningInExtension()) {
+    // Verify chrome.runtime is accessible
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      return true
+    }
+    return false
+  }
+
+  // For external web pages, we need chrome.runtime and an extension ID
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+    return false
+  }
+
+  const extensionId = getExtensionId()
+  if (!extensionId) {
+    return false
+  }
+
+  // Try to ping the extension to verify it's responsive
   try {
-    const extensionId = getExtensionId()
-    if (!extensionId) return false
-    
+    const runtime = chrome.runtime!
     return new Promise((resolve) => {
       const timeout = setTimeout(() => resolve(false), 1000)
-      
-      chrome.runtime.sendMessage(extensionId, { action: 'PING' }, (response) => {
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(runtime.sendMessage as any)(extensionId, { type: 'PING' }, (response: any) => {
         clearTimeout(timeout)
-        resolve(!chrome.runtime?.lastError && !!response)
+        if (runtime.lastError) {
+          resolve(false)
+          return
+        }
+        resolve(response?.ok === true)
       })
     })
   } catch {
     return false
   }
-  */
 }

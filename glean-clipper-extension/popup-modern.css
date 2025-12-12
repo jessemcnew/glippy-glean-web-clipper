@@ -849,3 +849,265 @@ body:has(.config-window.active) .popup-shell {
   to { transform: rotate(360deg); }
 }
 
+/* Light Theme Overrides */
+body.light-theme {
+  background: #ffffff;
+  color: #1f2937;
+}
+
+body.light-theme .popup-shell {
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .popup-header {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+body.light-theme .popup-title {
+  color: #111827;
+}
+
+body.light-theme .popup-subtitle {
+  color: #6b7280;
+}
+
+body.light-theme .menu-item {
+  color: #374151;
+}
+
+body.light-theme .menu-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .menu-icon {
+  color: #6b7280;
+}
+
+body.light-theme .menu-label {
+  color: #111827;
+}
+
+body.light-theme .menu-shortcut {
+  color: #9ca3af;
+}
+
+body.light-theme .menu-divider {
+  background: #e5e7eb;
+}
+
+body.light-theme .settings-drawer {
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+}
+
+body.light-theme .settings-title {
+  color: #111827;
+}
+
+body.light-theme .settings-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+body.light-theme .settings-card-title {
+  color: #111827;
+}
+
+body.light-theme .form-input,
+body.light-theme .form-select {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #111827;
+}
+
+body.light-theme .form-hint {
+  color: #6b7280;
+}
+
+body.light-theme .strong-hint {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+
+body.light-theme .oauth-btn,
+body.light-theme .manual-toggle-btn {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+body.light-theme .collection-results {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+body.light-theme .toggle-label {
+  color: #374151;
+}
+
+body.light-theme .toggle-slider {
+  background: #d1d5db;
+}
+
+body.light-theme .status-badge {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+body.light-theme .btn {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+body.light-theme .btn-secondary {
+  background: #f3f4f6;
+}
+
+body.light-theme .btn-warning {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+body.light-theme .config-window {
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  color: #1f2937;
+}
+
+body.light-theme .config-back {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+body.light-theme .config-back svg {
+  color: #6b7280;
+}
+
+body.light-theme .config-title {
+  color: #111827;
+}
+
+body.light-theme .config-section {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+body.light-theme .config-section-title {
+  color: #111827;
+}
+
+body.light-theme .config-card {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+body.light-theme .config-card-visual {
+  border: 1px solid #e5e7eb;
+  background: linear-gradient(180deg, #f8fafc, #f3f4f6);
+}
+
+body.light-theme .config-card-visual.light {
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+}
+
+body.light-theme .config-card-label {
+  color: #374151;
+}
+
+body.light-theme .config-card:has(input:checked) {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+body.light-theme .config-grid-item {
+  border-top: 1px solid #e5e7eb;
+}
+
+body.light-theme .config-grid-label {
+  color: #6b7280;
+}
+
+body.light-theme .config-grid-value {
+  color: #111827;
+}
+
+body.light-theme .config-toggle-row {
+  border-top: 1px solid #e5e7eb;
+}
+
+body.light-theme .config-toggle-title {
+  color: #111827;
+}
+
+body.light-theme .config-toggle-sub {
+  color: #6b7280;
+}
+
+body.light-theme .config-switch-slider {
+  background: #d1d5db;
+}
+
+body.light-theme .config-secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+
+body.light-theme .config-ghost {
+  background: #ffffff;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+
+body.light-theme .config-input {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+}
+
+body.light-theme .config-collections {
+  border-top: 1px solid #e5e7eb;
+}
+
+body.light-theme .config-collection-item {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+}
+
+body.light-theme .config-collection-item:hover {
+  background: #f3f4f6;
+}
+
+body.light-theme .config-collection-item span {
+  color: #374151;
+}
+
+body.light-theme .slack-modal-content {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+body.light-theme .slack-modal-header {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+body.light-theme .slack-modal-header h2 {
+  color: #111827;
+}
+
+body.light-theme .slack-status {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+}
+
+body.light-theme .slack-select,
+body.light-theme .slack-textarea {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #111827;
+}
+

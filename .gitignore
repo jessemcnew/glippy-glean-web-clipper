@@ -51,6 +51,8 @@ Thumbs.db
 /coverage
 .nyc_output
 test-results/
+.env.test.local
+**/tests/.env.test.local
 
 # Vercel
 .vercel
@@ -85,4 +87,7 @@ ENV/
 # Personal/user-specific files
 Users/
 **/Users/
+
+# Obsidian vault (local notes/changelog)
+obsidian-project-vault/
 

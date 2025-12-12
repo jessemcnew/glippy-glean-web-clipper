@@ -67,6 +67,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   setupTabNavigation();
   setupCollectionsUI();
+
+  // Apply saved theme on load
+  if (isChromeExtension()) {
+    const result = await chrome.storage.local.get(['preferences']);
+    const prefs = result.preferences || { theme: 'system' };
+    applyTheme(prefs.theme);
+  }
 });
 
 // Load clips from storage
@@ -294,7 +301,9 @@ function renderClips() {
 // Update clip count
 function updateClipCount() {
   const count = allClips.length;
-  clipCount.textContent = `${count} clip${count !== 1 ? 's' : ''} saved`;
+  if (clipCount) {
+    clipCount.textContent = `${count} clip${count !== 1 ? 's' : ''} saved`;
+  }
 }
 
 // Format date for display
@@ -758,8 +767,15 @@ function setupEventListeners() {
     });
   }
 
-  const recentClipsUrl = chrome.runtime?.getURL ? chrome.runtime.getURL('reader.html') : 'reader.html';
-  const libraryUrl = chrome.runtime?.getURL ? chrome.runtime.getURL('library.html') : 'library.html';
+  // Dashboard URLs - extension opens the bundled dashboard
+  // In dev: use localhost:3000, in prod: use bundled files
+  const isDev = false; // Set to true for local development
+  const DASHBOARD_BASE = isDev 
+    ? 'http://localhost:3000' 
+    : chrome.runtime.getURL('dashboard');
+  const recentClipsUrl = `${DASHBOARD_BASE}/index.html`;
+  const libraryUrl = `${DASHBOARD_BASE}/library/index.html`;
+  const promptsUrl = `${DASHBOARD_BASE}/prompts/index.html`;
 
   if (menuRecentClips) {
     menuRecentClips.addEventListener('click', () => {
@@ -774,7 +790,6 @@ function setupEventListeners() {
   const menuPrompts = getElement('menu-prompts');
   if (menuPrompts) {
     menuPrompts.addEventListener('click', () => {
-      const promptsUrl = chrome.runtime?.getURL ? chrome.runtime.getURL('prompts.html') : 'prompts.html';
       if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
         chrome.tabs.create({ url: promptsUrl });
       } else {
@@ -1009,6 +1024,9 @@ function setupEventListeners() {
   }
   const configBack = document.getElementById('config-back');
   if (configBack) configBack.addEventListener('click', closeConfigWindow);
+
+  // Setup preferences/config window functionality
+  setupPreferences();
 
   if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', saveSettings);
@@ -1898,6 +1916,111 @@ async function addClipToCollection(collectionId, clip) {
   } catch (error) {
     console.error('Failed to add clip to collection:', error);
     showTemporaryMessage('Failed to add clip to collection');
+  }
+}
+
+// Setup preferences functionality
+async function setupPreferences() {
+  // Load saved preferences
+  try {
+    if (isChromeExtension()) {
+      const result = await chrome.storage.local.get(['preferences']);
+      const prefs = result.preferences || {
+        theme: 'system',
+        collectMode: 'popup',
+        askWhereToSave: false,
+        downloadThroughBrowser: false,
+      };
+
+      // Apply theme preference
+      const themeRadios = document.querySelectorAll('input[name="theme-choice"]');
+      themeRadios.forEach(radio => {
+        if (radio.value === prefs.theme) {
+          radio.checked = true;
+        }
+      });
+
+      // Apply collect mode preference
+      const collectRadios = document.querySelectorAll('input[name="collect-mode"]');
+      collectRadios.forEach(radio => {
+        if (radio.value === prefs.collectMode) {
+          radio.checked = true;
+        }
+      });
+
+      // Apply toggle preferences
+      const toggleRows = document.querySelectorAll('.config-toggle-row');
+      if (toggleRows.length >= 2) {
+        const askToggle = toggleRows[0].querySelector('input[type="checkbox"]');
+        const downloadToggle = toggleRows[1].querySelector('input[type="checkbox"]');
+        if (askToggle) askToggle.checked = prefs.askWhereToSave;
+        if (downloadToggle) downloadToggle.checked = prefs.downloadThroughBrowser;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load preferences:', error);
+  }
+
+  // Save preferences when changed
+  const savePrefs = async () => {
+    if (!isChromeExtension()) return;
+
+    const themeRadio = document.querySelector('input[name="theme-choice"]:checked');
+    const collectRadio = document.querySelector('input[name="collect-mode"]:checked');
+    const toggleRows = document.querySelectorAll('.config-toggle-row');
+
+    const prefs = {
+      theme: themeRadio?.value || 'system',
+      collectMode: collectRadio?.value || 'popup',
+      askWhereToSave: false,
+      downloadThroughBrowser: false,
+    };
+
+    if (toggleRows.length >= 2) {
+      const askToggle = toggleRows[0].querySelector('input[type="checkbox"]');
+      const downloadToggle = toggleRows[1].querySelector('input[type="checkbox"]');
+      prefs.askWhereToSave = askToggle?.checked || false;
+      prefs.downloadThroughBrowser = downloadToggle?.checked || false;
+    }
+
+    try {
+      await chrome.storage.local.set({ preferences: prefs });
+      console.log('Preferences saved:', prefs);
+
+      // Apply theme immediately
+      applyTheme(prefs.theme);
+    } catch (error) {
+      console.error('Failed to save preferences:', error);
+    }
+  };
+
+  // Add event listeners for preference changes
+  document.querySelectorAll('input[name="theme-choice"]').forEach(radio => {
+    radio.addEventListener('change', savePrefs);
+  });
+
+  document.querySelectorAll('input[name="collect-mode"]').forEach(radio => {
+    radio.addEventListener('change', savePrefs);
+  });
+
+  document.querySelectorAll('.config-toggle-row input[type="checkbox"]').forEach(toggle => {
+    toggle.addEventListener('change', savePrefs);
+  });
+}
+
+// Apply theme to popup
+function applyTheme(theme) {
+  const body = document.body;
+
+  if (theme === 'system') {
+    // Check system preference - default CSS is dark, add light-theme for light mode
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    body.classList.toggle('light-theme', !prefersDark);
+  } else if (theme === 'light') {
+    body.classList.add('light-theme');
+  } else {
+    // dark or default
+    body.classList.remove('light-theme');
   }
 }
 

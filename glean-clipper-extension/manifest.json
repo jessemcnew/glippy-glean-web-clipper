@@ -15,7 +15,7 @@
   },
   
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self';"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
   },
 
   "background": {
@@ -26,7 +26,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": ["command-palette.js", "content.js"],
       "css": ["content.css"]
     }
   ],
@@ -58,7 +58,8 @@
         "prompts.html",
         "reader.css",
         "library.css",
-        "prompts.css"
+        "prompts.css",
+        "dashboard/*"
       ],
       "matches": ["<all_urls>"]
     }
