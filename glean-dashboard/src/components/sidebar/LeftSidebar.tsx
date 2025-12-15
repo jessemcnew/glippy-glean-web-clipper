@@ -89,14 +89,47 @@ export function LeftSidebar({
 
   return (
     <div className="flex flex-col h-full w-72">
-      {/* Header */}
+      {/* Header - Logo Lockup */}
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          Glippy
-        </h1>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Personal Knowledge Manager
-        </p>
+        <div className="flex items-center gap-2">
+          <svg
+            className="w-8 h-8 text-zinc-900 dark:text-zinc-100 flex-shrink-0"
+            viewBox="0 0 48 48"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M32 14L18 28C16.3431 29.6569 16.3431 32.3431 18 34C19.6569 35.6569 22.3431 35.6569 24 34L36 22C39.3137 18.6863 39.3137 13.3137 36 10C32.6863 6.68629 27.3137 6.68629 24 10L12 22C7.02944 26.9706 7.02944 34.0294 12 39C16.9706 43.9706 24.0294 43.9706 29 39L41 27"
+              stroke="currentColor"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <div className="flex flex-col">
+            <h1 className="text-xl font-bold tracking-tight leading-none text-zinc-900 dark:text-zinc-100">
+              Glippy
+            </h1>
+            <div className="flex items-center gap-1 mt-0.5">
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tracking-widest uppercase">
+                A
+              </span>
+              <img
+                src="./images/gln-logo-wordmark-black.png"
+                alt="Glean"
+                className="h-2.5 opacity-60 dark:hidden"
+              />
+              <img
+                src="./images/gln-logo-wordmark-white.png"
+                alt="Glean"
+                className="h-2.5 opacity-60 hidden dark:inline"
+              />
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tracking-widest uppercase">
+                Clipper
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Scrollable content */}

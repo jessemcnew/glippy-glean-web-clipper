@@ -220,25 +220,42 @@ export default function LoginForm() {
       <div className="w-full max-w-md relative z-10">
         {/* Logo and header */}
         <header className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-lg mb-4" role="img" aria-label="Glean logo">
+          <div className="flex flex-col items-center gap-3 mb-4">
             <svg
-              viewBox="0 0 24 24"
+              className="w-12 h-12 text-foreground"
+              viewBox="0 0 48 48"
               fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-6 h-6 text-primary"
-              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              role="img"
+              aria-label="Glippy logo"
             >
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              <path d="M12 6v6" />
-              <path d="M9 9h6" />
+              <path
+                d="M32 14L18 28C16.3431 29.6569 16.3431 32.3431 18 34C19.6569 35.6569 22.3431 35.6569 24 34L36 22C39.3137 18.6863 39.3137 13.3137 36 10C32.6863 6.68629 27.3137 6.68629 24 10L12 22C7.02944 26.9706 7.02944 34.0294 12 39C16.9706 43.9706 24.0294 43.9706 29 39L41 27"
+                stroke="currentColor"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
+            <div className="flex flex-col items-center">
+              <span className="text-3xl font-bold tracking-tight text-foreground">Glippy</span>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="text-xs text-muted-foreground tracking-widest uppercase">A</span>
+                <img
+                  src="./images/gln-logo-wordmark-black.png"
+                  alt="Glean"
+                  className="h-3 opacity-60 dark:hidden"
+                />
+                <img
+                  src="./images/gln-logo-wordmark-white.png"
+                  alt="Glean"
+                  className="h-3 opacity-60 hidden dark:inline"
+                />
+                <span className="text-xs text-muted-foreground tracking-widest uppercase">Clipper</span>
+              </div>
+            </div>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-balance">Welcome to Glean</h1>
-          <p className="text-muted-foreground mt-2 text-pretty">Sign in to access your dashboard and insights</p>
+          <p className="text-muted-foreground mt-2 text-pretty">Sign in to access your clips and collections</p>
         </header>
 
         {/* Login card */}
@@ -274,7 +291,7 @@ export default function LoginForm() {
               </Button>
               {extensionAvailable && (
                 <p className="text-xs text-muted-foreground text-center">
-                  Using OAuth token from Glean Web Clipper extension
+                  Using OAuth token from Glippy extension
                 </p>
               )}
 

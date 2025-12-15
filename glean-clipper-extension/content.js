@@ -99,12 +99,10 @@ function ensureRadialStyles() {
       animation: glippy-pulse 3s ease-in-out infinite, glippy-scale-in 0.3s ease-out;
     }
 
-    .glippy-radial-center-letter {
-      font-size: 48px;
-      font-weight: 700;
+    .glippy-radial-center-icon {
+      width: 56px;
+      height: 56px;
       color: #fafafa;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      line-height: 1;
     }
 
     /* Action Buttons */
@@ -320,10 +318,12 @@ function createRadialMenu() {
   const inner = document.createElement('div');
   inner.className = 'glippy-radial-inner';
 
-  // Center circle with "G"
+  // Center circle with Glippy paperclip icon
   const center = document.createElement('div');
   center.className = 'glippy-radial-center';
-  center.innerHTML = '<span class="glippy-radial-center-letter">G</span>';
+  center.innerHTML = `<svg class="glippy-radial-center-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M32 14L18 28C16.3431 29.6569 16.3431 32.3431 18 34C19.6569 35.6569 22.3431 35.6569 24 34L36 22C39.3137 18.6863 39.3137 13.3137 36 10C32.6863 6.68629 27.3137 6.68629 24 10L12 22C7.02944 26.9706 7.02944 34.0294 12 39C16.9706 43.9706 24.0294 43.9706 29 39L41 27" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
   inner.appendChild(center);
 
   // Hover label (hidden by default)

@@ -338,3 +338,4 @@ cd glean-dashboard && npm run lint
 - **Dashboard** (Next.js) → sends messages → **Background** → reads/writes → **chrome.storage.local**
 - **Content scripts** (content.js, command-palette.js) → injected on all pages → send messages → **Background**
 - please use subagents whenver possible if it makes sense to
+- wait, i know i said all ui stuff is to be made with v0. that is for all ui stuff related to the app popup and pages, for the logo design and all of the branding stuff, let's use nano pro for all of that

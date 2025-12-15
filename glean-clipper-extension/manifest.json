@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Glean Web Clipper",
+  "name": "Glippy - A Glean Clipper",
   "version": "0.1.0",
-  "description": "Clip web content to your personal Glean knowledge base. Save articles, notes, and web pages directly to your Glean collections.",
+  "description": "Enterprise context management for Glean. Capture critical information from any source into your Glean workspace.",
 
   "permissions": ["activeTab", "storage", "contextMenus", "scripting", "identity"],
 

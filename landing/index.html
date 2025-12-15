@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glippy - Enterprise Context Management for Glean</title>
+  <meta name="description" content="Capture critical information from any source into your Glean workspace. Enterprise-grade web clipping for knowledge management.">
+  <meta property="og:title" content="Glippy - A Glean Clipper">
+  <meta property="og:description" content="Enterprise context management for Glean">
+  <meta property="og:image" content="./assets/og-card.png">
+  <link rel="icon" type="image/png" href="./assets/icon32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-dark: #0C0D0F;
+      --bg-light: #FBF8F3;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --text-light: #FBF8F3;
+      --text-muted: #71717a;
+      --border: #27272a;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-light);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 16px 0;
+      background: rgba(12, 13, 15, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-light);
+    }
+
+    .nav-logo svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    .nav-logo-text {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: var(--primary);
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .nav-cta:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 120px 0 80px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-content {
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 24px;
+      color: var(--text-light);
+    }
+
+    .hero-title {
+      font-size: clamp(40px, 8vw, 72px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 8px;
+    }
+
+    .hero-subtitle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 16px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .hero-subtitle img {
+      height: 14px;
+      opacity: 0.6;
+    }
+
+    .hero-tagline {
+      font-size: clamp(18px, 3vw, 24px);
+      color: var(--text-muted);
+      margin-bottom: 40px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 32px;
+      background: var(--primary);
+      color: white;
+      text-decoration: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 18px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 24px rgba(37, 99, 235, 0.3);
+    }
+
+    .hero-cta:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(37, 99, 235, 0.4);
+    }
+
+    .hero-cta svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Benefits */
+    .benefits {
+      padding: 120px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 16px;
+    }
+
+    .section-heading {
+      text-align: center;
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 64px;
+    }
+
+    .benefits-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 32px;
+    }
+
+    .benefit-card {
+      padding: 32px;
+      background: rgba(39, 39, 42, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      transition: all 0.3s;
+    }
+
+    .benefit-card:hover {
+      background: rgba(39, 39, 42, 0.5);
+      border-color: rgba(37, 99, 235, 0.3);
+      transform: translateY(-4px);
+    }
+
+    .benefit-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(37, 99, 235, 0.1);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      color: var(--primary);
+    }
+
+    .benefit-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .benefit-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .benefit-desc {
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    /* How it works */
+    .how-it-works {
+      padding: 120px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 48px;
+      margin-top: 64px;
+    }
+
+    .step {
+      text-align: center;
+    }
+
+    .step-number {
+      width: 56px;
+      height: 56px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 auto 24px;
+    }
+
+    .step-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .step-desc {
+      color: var(--text-muted);
+      font-size: 15px;
+    }
+
+    /* CTA Section */
+    .cta-section {
+      padding: 120px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .cta-section h2 {
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 24px;
+    }
+
+    .cta-section p {
+      color: var(--text-muted);
+      font-size: 18px;
+      margin-bottom: 40px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Footer */
+    footer {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    footer .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    .footer-logo svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 32px;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--text-light);
+    }
+
+    .footer-copy {
+      color: var(--text-muted);
+      font-size: 14px;
+      width: 100%;
+      text-align: center;
+      margin-top: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .nav-cta span {
+        display: none;
+      }
+
+      .footer-links {
+        gap: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav>
+    <div class="container">
+      <a href="#" class="nav-logo">
+        <svg viewBox="0 0 48 48" fill="none">
+          <path d="M32 14L18 28C16.3431 29.6569 16.3431 32.3431 18 34C19.6569 35.6569 22.3431 35.6569 24 34L36 22C39.3137 18.6863 39.3137 13.3137 36 10C32.6863 6.68629 27.3137 6.68629 24 10L12 22C7.02944 26.9706 7.02944 34.0294 12 39C16.9706 43.9706 24.0294 43.9706 29 39L41 27" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="nav-logo-text">Glippy</span>
+      </a>
+      <a href="#" class="nav-cta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="12" cy="12" r="4"/>
+          <line x1="21.17" y1="8" x2="12" y2="8"/>
+          <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
+          <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+        </svg>
+        <span>Add to Chrome</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content">
+        <svg class="hero-icon" viewBox="0 0 48 48" fill="none">
+          <path d="M32 14L18 28C16.3431 29.6569 16.3431 32.3431 18 34C19.6569 35.6569 22.3431 35.6569 24 34L36 22C39.3137 18.6863 39.3137 13.3137 36 10C32.6863 6.68629 27.3137 6.68629 24 10L12 22C7.02944 26.9706 7.02944 34.0294 12 39C16.9706 43.9706 24.0294 43.9706 29 39L41 27" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h1 class="hero-title">Glippy</h1>
+        <div class="hero-subtitle">
+          <span>A</span>
+          <img src="./assets/gln-logo-wordmark-white.png" alt="Glean">
+          <span>Clipper</span>
+        </div>
+        <p class="hero-tagline">Enterprise context management for Glean. Capture critical information from any source into your workspace.</p>
+        <a href="#" class="hero-cta">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="4"/>
+            <line x1="21.17" y1="8" x2="12" y2="8"/>
+            <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
+            <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+          </svg>
+          Add to Chrome - Free
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Benefits Section -->
+  <section class="benefits">
+    <div class="container">
+      <p class="section-title">Why Glippy</p>
+      <h2 class="section-heading">Everything you need for knowledge capture</h2>
+      <div class="benefits-grid">
+        <div class="benefit-card">
+          <div class="benefit-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </div>
+          <h3 class="benefit-title">Capture Context</h3>
+          <p class="benefit-desc">Save critical information from any source into your Glean workspace with a single click or keyboard shortcut.</p>
+        </div>
+        <div class="benefit-card">
+          <div class="benefit-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <h3 class="benefit-title">Structured Knowledge</h3>
+          <p class="benefit-desc">Automatically organized and connected to your enterprise data. Every clip is tagged, searchable, and accessible.</p>
+        </div>
+        <div class="benefit-card">
+          <div class="benefit-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </div>
+          <h3 class="benefit-title">Instant Retrieval</h3>
+          <p class="benefit-desc">Surface saved context exactly when you need it through Glean search. Your knowledge, always at your fingertips.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it Works -->
+  <section class="how-it-works">
+    <div class="container">
+      <p class="section-title">How it works</p>
+      <h2 class="section-heading">Three steps to organized knowledge</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <h3 class="step-title">Select Content</h3>
+          <p class="step-desc">Highlight any text, image, or entire page you want to save for later reference.</p>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <h3 class="step-title">Click to Clip</h3>
+          <p class="step-desc">Use the radial menu or keyboard shortcut to instantly save to your Glean collection.</p>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <h3 class="step-title">Find in Glean</h3>
+          <p class="step-desc">Your clips appear in Glean search results, connected to your enterprise knowledge graph.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta-section">
+    <div class="container">
+      <h2>Ready to capture smarter?</h2>
+      <p>Join thousands of knowledge workers using Glippy to build their personal knowledge base.</p>
+      <a href="#" class="hero-cta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="12" cy="12" r="4"/>
+          <line x1="21.17" y1="8" x2="12" y2="8"/>
+          <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
+          <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+        </svg>
+        Get Glippy for Chrome
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <a href="#" class="footer-logo">
+        <svg viewBox="0 0 48 48" fill="none">
+          <path d="M32 14L18 28C16.3431 29.6569 16.3431 32.3431 18 34C19.6569 35.6569 22.3431 35.6569 24 34L36 22C39.3137 18.6863 39.3137 13.3137 36 10C32.6863 6.68629 27.3137 6.68629 24 10L12 22C7.02944 26.9706 7.02944 34.0294 12 39C16.9706 43.9706 24.0294 43.9706 29 39L41 27" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Glippy</span>
+      </a>
+      <div class="footer-links">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Support</a>
+        <a href="https://github.com">GitHub</a>
+      </div>
+      <p class="footer-copy">Built for Glean. Not affiliated with Glean, Inc.</p>
+    </div>
+  </footer>
+</body>
+</html>
