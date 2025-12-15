@@ -5,6 +5,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import ThemeToggleFloating from "@/components/ThemeToggleFloating";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,15 +33,18 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider>
-          <AuthProvider>
-            <SidebarProvider>
-              <ToastProvider>
-                {children}
-              </ToastProvider>
-            </SidebarProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <AuthProvider>
+              <SidebarProvider>
+                <ToastProvider>
+                  <ThemeToggleFloating />
+                  {children}
+                </ToastProvider>
+              </SidebarProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
