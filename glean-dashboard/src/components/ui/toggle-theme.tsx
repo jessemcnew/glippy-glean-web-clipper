@@ -3,21 +3,21 @@
 import React from 'react';
 import { MonitorCogIcon, MoonStarIcon, SunIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 
 const THEME_OPTIONS = [
 	{
 		icon: MonitorCogIcon,
-		value: 'system',
+		value: 'system' as const,
 	},
 	{
 		icon: SunIcon,
-		value: 'light',
+		value: 'light' as const,
 	},
 	{
 		icon: MoonStarIcon,
-		value: 'dark',
+		value: 'dark' as const,
 	},
 ];
 
@@ -45,6 +45,7 @@ export function ToggleTheme() {
 		>
 			{THEME_OPTIONS.map((option) => (
 				<button
+					key={option.value}
 					className={cn(
 						'relative flex size-7 cursor-pointer items-center justify-center rounded-md transition-all',
 						theme === option.value

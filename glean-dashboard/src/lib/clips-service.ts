@@ -1,8 +1,7 @@
 // Clips service for fetching and managing clips
-// This service can fetch clips from various sources:
-// 1. Extension storage (via Chrome extension messaging if available)
-// 2. Glean API (if clips are synced to Glean)
-// 3. Local storage (for development/testing)
+// This service fetches clips from Chrome extension storage via message passing
+
+import { sendExtensionMessage, isExtensionAvailable } from './extension-messaging'
 
 export interface Clip {
   id: string | number
@@ -21,36 +20,36 @@ export interface Clip {
 }
 
 /**
- * Fetches clips from localStorage
- * The extension stores clips in localStorage, which the dashboard can read directly
+ * Fetches clips from Chrome extension storage via message passing
+ * Falls back to mock data for development (localhost) or when extension unavailable
  */
 export async function fetchClips(): Promise<Clip[]> {
   try {
-    return getClipsFromLocalStorage()
+    // Try to fetch from extension first
+    if (isExtensionAvailable()) {
+      const response = await sendExtensionMessage<{ success: boolean; clips?: any[] }>({
+        action: 'getClips',
+      })
+
+      if (response?.success && response.clips) {
+        return normalizeClips(response.clips)
+      }
+    }
+
+    // Fallback: check if we're in development mode (localhost)
+    const isDev = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    
+    if (isDev) {
+      // In development, return mock data
+      return getMockClips()
+    }
+
+    // Production fallback: empty array
+    return []
   } catch (error) {
     console.error('Failed to fetch clips:', error)
     return []
-  }
-}
-
-/**
- * Gets clips from localStorage (development fallback)
- */
-function getClipsFromLocalStorage(): Clip[] {
-  try {
-    const stored = localStorage.getItem('glean_clips')
-    if (!stored) {
-      // Return mock data for development/demo
-      return getMockClips()
-    }
-    const clips = JSON.parse(stored)
-    if (clips.length === 0) {
-      return getMockClips()
-    }
-    return normalizeClips(clips)
-  } catch (error) {
-    console.error('Failed to parse clips from localStorage:', error)
-    return getMockClips()
   }
 }
 
@@ -156,30 +155,20 @@ function formatDate(timestamp: number | string): string {
 }
 
 /**
- * Deletes a clip by ID from localStorage
+ * Deletes a clip by ID via Chrome extension message passing
  */
 export async function deleteClip(clipId: string | number): Promise<boolean> {
   try {
-    return deleteClipFromLocalStorage(clipId)
+    if (isExtensionAvailable()) {
+      const response = await sendExtensionMessage<{ success: boolean }>({
+        action: 'deleteClip',
+        clipId: String(clipId),
+      })
+      return response?.success === true
+    }
+    return false
   } catch (error) {
     console.error('Failed to delete clip:', error)
-    return false
-  }
-}
-
-/**
- * Deletes clip from localStorage
- */
-function deleteClipFromLocalStorage(clipId: string | number): boolean {
-  try {
-    const stored = localStorage.getItem('glean_clips')
-    if (!stored) return false
-    const clips = JSON.parse(stored)
-    const filtered = clips.filter((c: any) => String(c.id) !== String(clipId))
-    localStorage.setItem('glean_clips', JSON.stringify(filtered))
-    return true
-  } catch (error) {
-    console.error('Failed to delete clip from localStorage:', error)
     return false
   }
 }

@@ -1,6 +1,7 @@
 // Collections service for fetching and managing user's Glean collections
 // Collections are fetched via Chrome extension messaging to the Glean API
 
+import { sendExtensionMessage, isExtensionAvailable } from './extension-messaging'
 import type { Clip } from './clips-service'
 
 export interface Collection {
@@ -30,9 +31,9 @@ export async function fetchCollections(): Promise<Collection[]> {
 
   try {
     // Try to fetch from extension
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime!.sendMessage({ action: 'fetchCollections' }, resolve)
+    if (isExtensionAvailable()) {
+      const response = await sendExtensionMessage<{ success: boolean; collections?: any[] }>({
+        action: 'fetchCollections',
       })
       if (response?.success && response?.collections) {
         const collections = normalizeCollections(response.collections)
@@ -54,12 +55,10 @@ export async function fetchCollections(): Promise<Collection[]> {
  */
 export async function fetchCollectionClips(collectionId: string | number): Promise<Clip[]> {
   try {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime!.sendMessage(
-          { action: 'fetchClipsFromGlean', collectionId: String(collectionId) },
-          resolve
-        )
+    if (isExtensionAvailable()) {
+      const response = await sendExtensionMessage<{ success: boolean; clips?: Clip[] }>({
+        action: 'fetchClipsFromGlean',
+        collectionId: String(collectionId),
       })
       if (response?.success && response?.clips) {
         return response.clips

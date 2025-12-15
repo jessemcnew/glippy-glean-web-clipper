@@ -1,5 +1,7 @@
 'use client'
 
+import { sendExtensionMessage, isExtensionAvailable } from './extension-messaging'
+
 type ConnectionState = 'connected' | 'disconnected' | 'checking'
 
 interface ConnectionResult {
@@ -23,10 +25,10 @@ export async function checkGleanConnection(): Promise<ConnectionResult> {
   if (cacheValid()) return cachedResult!
 
   try {
-    // Prefer extension ping if available
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      const response = await new Promise<any>((resolve) => {
-        chrome.runtime!.sendMessage({ action: 'pingGlean' }, resolve)
+    // Prefer extension testConnection if available
+    if (isExtensionAvailable()) {
+      const response = await sendExtensionMessage<{ success: boolean; error?: string }>({
+        action: 'testConnection',
       })
       if (response?.success) {
         return cacheResult({ state: 'connected' })

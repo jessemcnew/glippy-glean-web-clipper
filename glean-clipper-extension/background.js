@@ -292,6 +292,27 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true;
 
+    case 'getPreferences':
+      // Get preferences from chrome.storage.local
+      chrome.storage.local.get(['preferences'], (result) => {
+        sendResponse({
+          success: true,
+          preferences: result.preferences || {},
+        });
+      });
+      return true;
+
+    case 'savePreferences':
+      // Save preferences to chrome.storage.local
+      if (request.preferences) {
+        chrome.storage.local.set({ preferences: request.preferences }, () => {
+          sendResponse({ success: true });
+        });
+      } else {
+        sendResponse({ success: false, error: 'No preferences provided' });
+      }
+      return true;
+
     default:
       // Ignore messages without action (like PING which uses 'type')
       if (request.action === undefined && request.type !== undefined) {

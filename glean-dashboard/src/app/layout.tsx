@@ -6,7 +6,6 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import ThemeToggleFloating from "@/components/ThemeToggleFloating";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,7 +37,6 @@ export default function RootLayout({
             <AuthProvider>
               <SidebarProvider>
                 <ToastProvider>
-                  <ThemeToggleFloating />
                   {children}
                 </ToastProvider>
               </SidebarProvider>

@@ -354,9 +354,11 @@ async function fetchGleanCollections() {
         });
       }
 
-      // Show all collections (user info endpoint not available)
-      // The API likely already filters to collections the user can access
-      const filteredCollections = allCollections;
+      // Filter to only show collections user created or is a member of
+      // Filter by write permissions (user is a member) - this is the most reliable indicator
+      const filteredCollections = allCollections.filter(col => 
+        col.permissions?.write === true
+      );
 
       console.log(`✅ Filtered to ${filteredCollections.length} collections (user's collections)`);
       console.log(`   (Filtered out ${allCollections.length - filteredCollections.length} collections)`);
