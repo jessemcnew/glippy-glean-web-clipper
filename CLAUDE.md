@@ -298,10 +298,20 @@ This section helps new Claude Code sessions pick up where the last one left off.
    - Organized extension folder: docs to `docs/`, scripts to `scripts/`, old HTML to `archive/old-html/`
    - Updated manifest.json to remove references to archived files
 
-**Pending Tasks:**
-1. **Connect popup to live extension data**: The popup currently uses mock data. Need to wire up `chrome.runtime.sendMessage` calls to fetch real collections and clips from storage
-2. **Preferences modal**: The modal opens but save/load cycle needs testing and potential fixes
-3. **Dashboard data connection**: Dashboard pages (library, prompts) use mock data; need to connect to extension storage via message passing
+**Pending Tasks (Consolidated):**
+
+**High Priority:**
+1. **Connect popup to live extension data**: Wire up `chrome.runtime.sendMessage` calls to fetch real collections and clips from storage (currently uses mock data)
+2. **Connect dashboard to real data**: Dashboard pages (library, prompts) use mock data; need to connect to extension storage via message passing
+3. **Preferences modal save/load cycle**: Modal opens but save/load cycle needs testing and potential fixes
+
+**Medium Priority:**
+4. **Search within clips**: Implement search functionality for saved clips
+5. **Tag management**: Add tagging system for organizing clips
+
+**Polish/Testing:**
+6. **Landing page**: Review and update landing page (`/landing/index.html`) - verify links, assets, and content
+7. **End-to-end testing**: Complete flow testing from clipping to dashboard display
 
 ### Key Files to Know
 
