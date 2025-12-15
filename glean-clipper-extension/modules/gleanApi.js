@@ -356,9 +356,20 @@ async function fetchGleanCollections() {
 
       // Filter to only show collections user created or is a member of
       // Filter by write permissions (user is a member) - this is the most reliable indicator
-      const filteredCollections = allCollections.filter(col => 
-        col.permissions?.write === true
-      );
+      const filteredCollections = allCollections
+        .filter(col => col.permissions?.write === true)
+        .map(col => {
+          // Add ownershipType field: 'owned' if user is owner/creator, 'shared' otherwise
+          // Note: To properly determine ownership, we need the current user ID from the token
+          // For now, we use a heuristic: if owner/creator fields exist, assume 'owned'
+          // TODO: Compare owner/creator with current user ID from token to accurately determine ownership
+          // This is a placeholder - in production, you'd decode the token to get user ID
+          const ownershipType = (col.owner || col.creator) ? 'owned' : 'shared';
+          return {
+            ...col,
+            ownershipType,
+          };
+        });
 
       console.log(`✅ Filtered to ${filteredCollections.length} collections (user's collections)`);
       console.log(`   (Filtered out ${allCollections.length - filteredCollections.length} collections)`);

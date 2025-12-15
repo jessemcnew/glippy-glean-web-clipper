@@ -95,13 +95,27 @@ export default function LibraryPage() {
     })
   }
 
+  const navigateToDashboard = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault()
+    // Handle navigation in Chrome extension context
+    if (typeof window !== 'undefined' && typeof chrome !== 'undefined' && chrome.runtime) {
+      // In extension context, use chrome.runtime.getURL
+      const dashboardUrl = chrome.runtime.getURL('dashboard/index.html')
+      window.location.href = dashboardUrl
+    } else {
+      // In regular web context, use relative path
+      window.location.href = '/index.html'
+    }
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="max-w-6xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <a
-              href="../"
+              href="#"
+              onClick={navigateToDashboard}
               className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-zinc-400" />
@@ -115,7 +129,8 @@ export default function LibraryPage() {
             </div>
           </div>
           <a
-            href="../"
+            href="#"
+            onClick={navigateToDashboard}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 transition-colors text-sm"
           >
             <Home className="w-4 h-4" />

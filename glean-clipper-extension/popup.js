@@ -73,7 +73,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const result = await chrome.storage.local.get(['preferences']);
     const prefs = result.preferences || { theme: 'system' };
     applyTheme(prefs.theme);
+    updateThemeToggleButtons(prefs.theme);
   }
+
+  // Theme toggle functionality
+  const themeToggleButtons = document.querySelectorAll('.theme-toggle-btn');
+  themeToggleButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const theme = btn.getAttribute('data-theme');
+      if (theme) {
+        setTheme(theme);
+      }
+    });
+  });
 });
 
 // Load clips from storage
@@ -715,14 +727,8 @@ function setupEventListeners() {
   const oauthStatus = getElement('oauth-status');
   const clipToGleanBtn = getElement('clip-to-glean-btn');
   const menuSaveCollection = getElement('menu-save-collection');
-  const menuSaveUrl = getElement('menu-save-url');
-  const menuRecentClips = getElement('menu-recent-clips');
-  const menuLibrary = getElement('menu-library');
-  const menuCaptureArea = getElement('menu-capture-area');
-  const menuCaptureVisible = getElement('menu-capture-visible');
-  const menuCapturePage = getElement('menu-capture-page');
+  const menuDashboard = getElement('menu-dashboard');
   const menuPreferences = getElement('menu-preferences');
-  const menuConfiguration = getElement('menu-configuration');
 
   // Clip to Glean button - clips currently selected text
   if (clipToGleanBtn) {
@@ -773,45 +779,25 @@ function setupEventListeners() {
     });
   }
 
-  if (menuSaveUrl) {
-    menuSaveUrl.addEventListener('click', async () => {
-      try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab?.id) return;
-        await safeRuntimeSendMessage({
-          action: 'saveClip',
-          data: {
-            url: tab.url || '',
-            title: tab.title || '',
-            selectedText: '',
-            domain: tab.url ? new URL(tab.url).hostname : '',
-            timestamp: Date.now(),
-          },
-        });
-        alert('✅ URL saved to Glean!');
-      } catch (error) {
-        console.error('Failed to save URL:', error);
-        alert('Failed to save URL.');
-      }
-    });
-  }
-
   // Dashboard URLs - extension opens the bundled dashboard
   // In dev: use localhost:3000, in prod: use bundled files
   const isDev = false; // Set to true for local development
   const DASHBOARD_BASE = isDev 
     ? 'http://localhost:3000' 
     : chrome.runtime.getURL('dashboard');
-  const recentClipsUrl = `${DASHBOARD_BASE}/index.html`;
-  const libraryUrl = `${DASHBOARD_BASE}/library/index.html`;
-  const promptsUrl = `${DASHBOARD_BASE}/prompts/index.html`;
+  // All navigation links point to main dashboard (index.html)
+  // Library and Prompts routes will be added to frontend later
+  const dashboardUrl = `${DASHBOARD_BASE}/index.html`;
+  const recentClipsUrl = dashboardUrl;
+  const libraryUrl = dashboardUrl;
+  const promptsUrl = dashboardUrl;
 
-  if (menuRecentClips) {
-    menuRecentClips.addEventListener('click', () => {
+  if (menuDashboard) {
+    menuDashboard.addEventListener('click', () => {
       if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
-        chrome.tabs.create({ url: recentClipsUrl });
+        chrome.tabs.create({ url: dashboardUrl });
       } else {
-        window.open(recentClipsUrl, '_blank');
+        window.open(dashboardUrl, '_blank');
       }
     });
   }
@@ -827,20 +813,6 @@ function setupEventListeners() {
     });
   }
 
-  if (menuLibrary) {
-    menuLibrary.addEventListener('click', () => {
-      if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
-        chrome.tabs.create({ url: libraryUrl });
-      } else {
-        window.open(libraryUrl, '_blank');
-      }
-    });
-  }
-
-  const comingSoon = () => alert('Capture actions will be available soon.');
-  if (menuCaptureArea) menuCaptureArea.addEventListener('click', comingSoon);
-  if (menuCaptureVisible) menuCaptureVisible.addEventListener('click', comingSoon);
-  if (menuCapturePage) menuCapturePage.addEventListener('click', comingSoon);
 
   const openSettings = () => {
     showSettings();
@@ -905,12 +877,10 @@ function setupEventListeners() {
 
   // Swap to correct navigation: Preferences -> config window (white), Configuration -> legacy settings
   if (menuPreferences) menuPreferences.addEventListener('click', openConfigWindow);
-  if (menuConfiguration) menuConfiguration.addEventListener('click', openSettings);
   if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
   if (settingsClose) settingsClose.addEventListener('click', hideSettings);
 
   // Slack Integration
-  const menuSlack = getElement('menu-slack');
   const slackModal = document.getElementById('slack-modal');
   const slackModalOverlay = document.getElementById('slack-modal-overlay');
   const slackModalClose = document.getElementById('slack-modal-close');
@@ -979,14 +949,6 @@ function setupEventListeners() {
     }
   };
 
-  if (menuSlack) {
-    menuSlack.addEventListener('click', () => {
-      if (slackModal) {
-        slackModal.style.display = 'flex';
-        checkSlackStatus();
-      }
-    });
-  }
 
   if (slackModalOverlay) {
     slackModalOverlay.addEventListener('click', () => {
@@ -2059,6 +2021,43 @@ function applyTheme(theme) {
     // dark or default
     body.classList.remove('light-theme');
   }
+}
+
+// Set theme and save preference
+function setTheme(theme) {
+  if (!isChromeExtension()) return;
+  
+  applyTheme(theme);
+  updateThemeToggleButtons(theme);
+  
+  // Save to storage
+  chrome.storage.local.get(['preferences'], (result) => {
+    const prefs = result.preferences || {};
+    prefs.theme = theme;
+    chrome.storage.local.set({ preferences: prefs });
+  });
+
+  // Listen for system theme changes if using 'system' theme
+  if (theme === 'system') {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = () => {
+      applyTheme('system');
+    };
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+  }
+}
+
+// Update theme toggle button active states
+function updateThemeToggleButtons(activeTheme) {
+  const buttons = document.querySelectorAll('.theme-toggle-btn');
+  buttons.forEach(btn => {
+    const btnTheme = btn.getAttribute('data-theme');
+    if (btnTheme === activeTheme) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
 }
 
 // Open notebook viewer
